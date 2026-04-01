@@ -1,0 +1,309 @@
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const { randomUUID } = require("crypto");
+const { URL } = require("url");
+
+const PORT = process.env.PORT || 3000;
+const PUBLIC_DIR = path.join(__dirname, "public");
+const DATA_FILE = path.join(__dirname, "shared_state.json");
+
+const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"];
+
+function emptyRoleAssignments() {
+  return {
+    interviewer: "",
+    hpi: "",
+    plan: "",
+    mse: "",
+    psychotherapy: "",
+    meds: "",
+  };
+}
+
+function defaultState() {
+  return {
+    students: [],
+    patients: [],
+    selectedPatientId: "",
+    updatedAt: Date.now(),
+  };
+}
+
+function normalizePatient(patient, index) {
+  const assignments = emptyRoleAssignments();
+  const sourceAssignments = patient?.assignments || {};
+
+  for (const key of ROLE_KEYS) {
+    assignments[key] = sourceAssignments[key] || "";
+  }
+
+  return {
+    id: patient?.id || randomUUID(),
+    label: patient?.label || `Patient ${index + 1}`,
+    assignments,
+  };
+}
+
+function loadState() {
+  try {
+    if (!fs.existsSync(DATA_FILE)) return defaultState();
+    const raw = fs.readFileSync(DATA_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    const patients = Array.isArray(parsed.patients)
+      ? parsed.patients.map((patient, index) => normalizePatient(patient, index))
+      : [];
+    const selectedPatientId = patients.some((p) => p.id === parsed.selectedPatientId)
+      ? parsed.selectedPatientId
+      : (patients[0]?.id || "");
+
+    return {
+      students: Array.isArray(parsed.students) ? parsed.students : [],
+      patients,
+      selectedPatientId,
+      updatedAt: parsed.updatedAt || Date.now(),
+    };
+  } catch {
+    return defaultState();
+  }
+}
+
+function saveState() {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2), "utf8");
+}
+
+let state = loadState();
+const clients = new Set();
+
+function sendJson(res, status, payload) {
+  const body = JSON.stringify(payload);
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(body),
+    "Cache-Control": "no-store",
+  });
+  res.end(body);
+}
+
+function broadcast() {
+  const data = `data: ${JSON.stringify(state)}\n\n`;
+  for (const client of clients) {
+    try {
+      client.write(data);
+    } catch {}
+  }
+}
+
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let raw = "";
+    req.on("data", (chunk) => {
+      raw += chunk;
+      if (raw.length > 1_000_000) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+      }
+    });
+    req.on("end", () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+function serveFile(reqPath, res) {
+  const safePath = reqPath === "/" ? "index.html" : reqPath.replace(/^\/+/, "");
+  const filePath = path.join(PUBLIC_DIR, safePath);
+
+  if (!filePath.startsWith(PUBLIC_DIR)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return;
+  }
+
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end("Not found");
+      return;
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const typeMap = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "text/javascript; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
+      ".json": "application/json; charset=utf-8",
+    };
+
+    res.writeHead(200, {
+      "Content-Type": typeMap[ext] || "application/octet-stream",
+      "Cache-Control": "no-store",
+    });
+    res.end(data);
+  });
+}
+
+function sortedStudents() {
+  return [...state.students]
+    .filter((student) => String(student.name || "").trim())
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+}
+
+function randomizePatient(patient) {
+  const available = sortedStudents();
+  if (!available.length) return;
+
+  const pool = [...available];
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  const keys = [...ROLE_KEYS];
+  for (let i = keys.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [keys[i], keys[j]] = [keys[j], keys[i]];
+  }
+
+  const assignments = emptyRoleAssignments();
+  keys.forEach((roleKey, index) => {
+    assignments[roleKey] = pool[index % pool.length].id;
+  });
+  patient.assignments = assignments;
+}
+
+async function handleUpdate(req, res) {
+  let body;
+  try {
+    body = await parseBody(req);
+  } catch {
+    sendJson(res, 400, { error: "Invalid JSON body" });
+    return;
+  }
+
+  const action = body.action;
+
+  if (action === "addStudent") {
+    state.students.push({
+      id: randomUUID(),
+      name: "",
+      order: state.students.length,
+    });
+  } else if (action === "updateStudentName") {
+    const student = state.students.find((s) => s.id === body.studentId);
+    if (!student) {
+      sendJson(res, 404, { error: "Student not found" });
+      return;
+    }
+    student.name = String(body.name || "");
+  } else if (action === "deleteStudent") {
+    state.students = state.students.filter((s) => s.id !== body.studentId);
+    state.patients = state.patients.map((patient) => {
+      const next = { ...patient, assignments: { ...patient.assignments } };
+      for (const key of ROLE_KEYS) {
+        if (next.assignments[key] === body.studentId) {
+          next.assignments[key] = "";
+        }
+      }
+      return next;
+    });
+  } else if (action === "resetBoard") {
+    state = defaultState();
+  } else if (action === "setPatientCount") {
+    const count = Math.max(0, Math.min(50, Number(body.count) || 0));
+    const next = [];
+    for (let i = 0; i < count; i += 1) {
+      const prev = state.patients[i];
+      next.push(normalizePatient(prev, i));
+    }
+    state.patients = next;
+    state.selectedPatientId = state.patients.some((p) => p.id === state.selectedPatientId)
+      ? state.selectedPatientId
+      : (state.patients[0]?.id || "");
+  } else if (action === "updatePatientRole") {
+    const patient = state.patients.find((p) => p.id === body.patientId);
+    if (!patient) {
+      sendJson(res, 404, { error: "Patient not found" });
+      return;
+    }
+    if (!ROLE_KEYS.includes(body.roleKey)) {
+      sendJson(res, 400, { error: "Invalid role key" });
+      return;
+    }
+    patient.assignments[body.roleKey] = String(body.studentId || "");
+  } else if (action === "randomizePatient") {
+    const patient = state.patients.find((p) => p.id === body.patientId);
+    if (!patient) {
+      sendJson(res, 404, { error: "Patient not found" });
+      return;
+    }
+    randomizePatient(patient);
+  } else if (action === "randomizeSchedule") {
+    state.patients.forEach((patient) => randomizePatient(patient));
+  } else if (action === "clearScheduleAssignments") {
+    state.patients = state.patients.map((patient) => ({
+      ...patient,
+      assignments: emptyRoleAssignments(),
+    }));
+  } else if (action === "setSelectedPatient") {
+    const patientId = String(body.patientId || "");
+    state.selectedPatientId = state.patients.some((p) => p.id === patientId)
+      ? patientId
+      : (state.patients[0]?.id || "");
+  } else {
+    sendJson(res, 400, { error: "Unknown action" });
+    return;
+  }
+
+  state.updatedAt = Date.now();
+  saveState();
+  broadcast();
+  sendJson(res, 200, { ok: true, state });
+}
+
+const server = http.createServer(async (req, res) => {
+  const urlObj = new URL(req.url, `http://${req.headers.host}`);
+
+  if (req.method === "GET" && urlObj.pathname === "/events") {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Connection": "keep-alive",
+    });
+
+    clients.add(res);
+    res.write(`data: ${JSON.stringify(state)}\n\n`);
+
+    req.on("close", () => {
+      clients.delete(res);
+    });
+    return;
+  }
+
+  if (req.method === "GET" && urlObj.pathname === "/state") {
+    sendJson(res, 200, state);
+    return;
+  }
+
+  if (req.method === "POST" && urlObj.pathname === "/update") {
+    await handleUpdate(req, res);
+    return;
+  }
+
+  if (req.method === "GET") {
+    serveFile(urlObj.pathname, res);
+    return;
+  }
+
+  res.writeHead(405);
+  res.end("Method not allowed");
+});
+
+server.listen(PORT, () => {
+  console.log(`InSync Roles Sync running on http://localhost:${PORT}`);
+});

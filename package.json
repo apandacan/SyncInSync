@@ -1,0 +1,9 @@
+{
+  "name": "insync-roles-sync-fixed-course-v6",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared live course board with patient-role table and local-only HPI",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

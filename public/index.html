@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>InSync Roles Sync</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #dbe3ee;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue-bg: #eff6ff;
+      --blue-border: #bfdbfe;
+      --blue-text: #1e3a8a;
+      --green-bg: #dcfce7;
+      --green-text: #166534;
+      --amber-bg: #fef3c7;
+      --amber-text: #92400e;
+      --danger-bg: #fee2e2;
+      --danger-text: #991b1b;
+      --btn: #0f172a;
+      --btn-text: #fff;
+      --btn-soft: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, system-ui, Arial, sans-serif; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 24px; display: grid; gap: 20px; }
+    .topbar { display: flex; justify-content: space-between; gap: 16px; align-items: end; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 34px; line-height: 1.1; }
+    h2 { margin: 0; font-size: 22px; }
+    p { margin: 0; }
+    .banner { padding: 14px 16px; border-radius: 16px; background: var(--blue-bg); border: 1px solid var(--blue-border); color: var(--blue-text); line-height: 1.6; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 20px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); display: grid; gap: 14px; }
+    .helper { color: var(--muted); line-height: 1.55; }
+    .label { font-size: 14px; font-weight: 600; color: #334155; display: block; margin-bottom: 6px; }
+    input, select, textarea {
+      width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: 11px 12px;
+      font: inherit; color: inherit; background: #fff;
+    }
+    input[type="number"] { max-width: 180px; }
+    textarea { min-height: 320px; resize: vertical; line-height: 1.55; padding: 14px; border-radius: 14px; }
+    .readonly { background: #f8fafc; }
+    .buttons, .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    button { border: 0; border-radius: 14px; padding: 11px 14px; font: inherit; font-weight: 700; cursor: pointer; }
+    .btn { background: var(--btn); color: var(--btn-text); }
+    .btn-soft { background: var(--btn-soft); color: var(--text); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger-text); }
+    .row { display: grid; gap: 10px; }
+    .row-2 { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+    .status { display: inline-block; border-radius: 999px; padding: 6px 10px; font-size: 13px; font-weight: 700; width: fit-content; }
+    .status.connected { background: var(--green-bg); color: var(--green-text); }
+    .status.waiting { background: var(--amber-bg); color: var(--amber-text); }
+    .mono { border: 1px dashed #cbd5e1; border-radius: 14px; padding: 14px; background: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; line-height: 1.6; overflow-wrap: anywhere; }
+    .empty { border: 1px dashed #cbd5e1; border-radius: 14px; padding: 18px; color: var(--muted); background: #f8fafc; }
+    .notice { color: var(--muted); font-size: 14px; }
+    .error { color: #b91c1c; white-space: pre-wrap; line-height: 1.5; }
+    .toast { position: fixed; right: 18px; bottom: 18px; background: #0f172a; color: #fff; padding: 10px 14px; border-radius: 12px; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.18); opacity: 0; transform: translateY(10px); pointer-events: none; transition: 0.18s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .patient-table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 16px; }
+    table { width: 100%; border-collapse: collapse; min-width: 1120px; }
+    th, td { border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; vertical-align: middle; }
+    th { background: #f8fafc; font-size: 13px; color: #475569; }
+    tr:last-child td { border-bottom: 0; }
+    .patient-label-cell { font-weight: 700; white-space: nowrap; }
+    .mini-btn { padding: 9px 11px; border-radius: 12px; font-size: 13px; }
+    @media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>InSync Roles Sync</h1>
+      </div>
+      <div class="buttons">
+        <button class="btn-soft" id="copyStudentLineBtn">Copy student line</button>
+        <button class="btn-soft" id="resetBoardBtn">Reset board</button>
+        <button class="btn" id="copyUpdatedHpiBtn">Copy updated HPI</button>
+      </div>
+    </div>
+
+    <div class="banner">
+      <strong>Shared live for everyone:</strong> student names and patient role assignments.
+      <strong>Local only:</strong> pasted HPI and generated updated HPI.
+      Only non-PHI should go into the shared board.
+    </div>
+
+    <section class="card">
+      <div class="topbar" style="align-items:center;">
+        <div>
+          <h2>Patient assignment board</h2>
+          <p class="helper">Patients are rows and roles are columns. You can sign up manually, randomize a single patient, or randomize the whole schedule.</p>
+        </div>
+        <div class="status waiting" id="statusPill">Connecting</div>
+      </div>
+
+      <div class="toolbar">
+        <label>
+          <span class="label">How many patients today?</span>
+          <input id="patientCountInput" type="number" min="0" max="50" placeholder="0" />
+        </label>
+        <button class="btn-soft" id="applyPatientCountBtn">Populate patients</button>
+        <button class="btn-soft" id="randomizeScheduleBtn">Randomize entire schedule</button>
+        <button class="btn-soft" id="clearScheduleAssignmentsBtn">Clear assignments</button>
+      </div>
+
+      <div class="notice" id="lastSync"></div>
+      <div class="error" id="errorBox"></div>
+
+      <div class="patient-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>Interviewer</th>
+              <th>HPI</th>
+              <th>Plan</th>
+              <th>MSE</th>
+              <th>Psychotherapy</th>
+              <th>Meds</th>
+              <th>Row action</th>
+            </tr>
+          </thead>
+          <tbody id="patientsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="grid-2">
+      <section class="card">
+        <div>
+          <h2>Shared student list</h2>
+          <p class="helper">This syncs live for everyone with the app open.</p>
+        </div>
+        <div class="buttons">
+          <button class="btn" id="addStudentBtn">Add student</button>
+        </div>
+        <div id="studentsList" class="row"></div>
+      </section>
+
+      <section class="card">
+        <div>
+          <h2>Local-only HPI box</h2>
+          <p class="helper">Pick which patient row should drive the note line. Interviewer is included in the list if assigned, but does not get a tag.</p>
+        </div>
+
+        <label>
+          <span class="label">Use assignments from patient</span>
+          <select id="selectedPatientSelect"></select>
+        </label>
+
+        <label>
+          <span class="label">Generated student line</span>
+          <div class="mono" id="studentLine">Add patients and assign roles.</div>
+        </label>
+
+        <label>
+          <span class="label">Old HPI</span>
+          <textarea id="oldHpi" placeholder="Paste prior HPI here"></textarea>
+        </label>
+        <label>
+          <span class="label">Updated HPI</span>
+          <textarea id="updatedHpi" class="readonly" readonly></textarea>
+        </label>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"];
+    const TAGGED_ROLE_KEYS = ["hpi", "plan", "mse", "psychotherapy", "meds"];
+
+    const ROLE_META = {
+      interviewer: { label: "Interviewer", suffix: "" },
+      hpi: { label: "HPI", suffix: "*" },
+      plan: { label: "Plan", suffix: "**" },
+      mse: { label: "MSE", suffix: "_MSE" },
+      psychotherapy: { label: "Psychotherapy", suffix: "~" },
+      meds: { label: "Meds", suffix: "^" },
+    };
+
+    function emptyRoleAssignments() {
+      return {
+        interviewer: "",
+        hpi: "",
+        plan: "",
+        mse: "",
+        psychotherapy: "",
+        meds: "",
+      };
+    }
+
+    const LOCAL_HPI_KEY = "insync-local-hpi-v1";
+
+    const els = {
+      studentsList: document.getElementById("studentsList"),
+      patientsTableBody: document.getElementById("patientsTableBody"),
+      patientCountInput: document.getElementById("patientCountInput"),
+      applyPatientCountBtn: document.getElementById("applyPatientCountBtn"),
+      randomizeScheduleBtn: document.getElementById("randomizeScheduleBtn"),
+      clearScheduleAssignmentsBtn: document.getElementById("clearScheduleAssignmentsBtn"),
+      selectedPatientSelect: document.getElementById("selectedPatientSelect"),
+      studentLine: document.getElementById("studentLine"),
+      oldHpi: document.getElementById("oldHpi"),
+      updatedHpi: document.getElementById("updatedHpi"),
+      statusPill: document.getElementById("statusPill"),
+      lastSync: document.getElementById("lastSync"),
+      errorBox: document.getElementById("errorBox"),
+      toast: document.getElementById("toast"),
+      addStudentBtn: document.getElementById("addStudentBtn"),
+      copyStudentLineBtn: document.getElementById("copyStudentLineBtn"),
+      copyUpdatedHpiBtn: document.getElementById("copyUpdatedHpiBtn"),
+      resetBoardBtn: document.getElementById("resetBoardBtn"),
+    };
+
+    let state = {
+      students: [],
+      patients: [],
+      selectedPatientId: "",
+      updatedAt: null,
+      oldHpi: sessionStorage.getItem(LOCAL_HPI_KEY) || "",
+      eventSource: null,
+      nameInputTimers: {},
+    };
+
+    function getFocusSnapshot() {
+      const active = document.activeElement;
+      if (!active) return null;
+
+      if (active.dataset.studentId) {
+        return {
+          type: "student",
+          id: active.dataset.studentId,
+          start: active.selectionStart,
+          end: active.selectionEnd,
+        };
+      }
+
+      if (active.dataset.patientId && active.dataset.roleKey) {
+        return {
+          type: "patient-role",
+          patientId: active.dataset.patientId,
+          roleKey: active.dataset.roleKey,
+        };
+      }
+
+      return null;
+    }
+
+    function restoreFocus(snapshot) {
+      if (!snapshot) return;
+      let selector = "";
+
+      if (snapshot.type === "student") {
+        selector = `input[data-student-id="${snapshot.id}"]`;
+      } else if (snapshot.type === "patient-role") {
+        selector = `select[data-patient-id="${snapshot.patientId}"][data-role-key="${snapshot.roleKey}"]`;
+      }
+
+      if (!selector) return;
+      const el = document.querySelector(selector);
+      if (!el) return;
+
+      el.focus();
+      if (snapshot.type === "student" && typeof snapshot.start === "number" && typeof snapshot.end === "number") {
+        try {
+          el.setSelectionRange(snapshot.start, snapshot.end);
+        } catch {}
+      }
+    }
+
+    function availableStudents() {
+      return [...state.students]
+        .filter((student) => (student.name || "").trim())
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+    }
+
+    function getSelectedPatient() {
+      return state.patients.find((patient) => patient.id === state.selectedPatientId) || state.patients[0] || null;
+    }
+
+    function buildStudentLine() {
+      const patient = getSelectedPatient();
+      if (!patient) return "";
+
+      const assignments = patient.assignments || emptyRoleAssignments();
+      const studentMap = new Map();
+      const studentsById = new Map(state.students.map((student) => [student.id, student]));
+
+      ROLE_KEYS.forEach((roleKey) => {
+        const studentId = assignments[roleKey];
+        if (!studentId) return;
+        const student = studentsById.get(studentId);
+        if (!student || !(student.name || "").trim()) return;
+        if (!studentMap.has(studentId)) studentMap.set(studentId, []);
+        if (TAGGED_ROLE_KEYS.includes(roleKey)) {
+          studentMap.get(studentId).push(roleKey);
+        }
+      });
+
+      const ordered = availableStudents().filter((student) => studentMap.has(student.id) || (assignments.interviewer === student.id));
+
+      const formatted = ordered.map((student) => {
+        const tags = (studentMap.get(student.id) || []).map((roleKey) => ROLE_META[roleKey].suffix).join("");
+        return (student.name || "").trim() + tags;
+      }).filter(Boolean);
+
+      if (!formatted.length) return "";
+      if (formatted.length === 1) return "medical student " + formatted[0] + ".";
+      if (formatted.length === 2) return "medical students " + formatted[0] + " and " + formatted[1] + ".";
+      return "medical students " + formatted.slice(0, -1).join(", ") + ", and " + formatted[formatted.length - 1] + ".";
+    }
+
+    function replaceStudentLine(text, newLine) {
+      if (!String(text || "").trim()) return "";
+      if (!newLine) return text;
+
+      const patterns = [
+        /medical students?[\s\S]*?\./i,
+        /The patient presents[\s\S]*?medical students?[\s\S]*?\./i,
+      ];
+
+      for (const pattern of patterns) {
+        if (pattern.test(text)) {
+          return text.replace(pattern, (match) => {
+            if (/The patient presents/i.test(match) && /medical students?/i.test(match)) {
+              return match.replace(/medical students?[\s\S]*?\./i, newLine);
+            }
+            return newLine;
+          });
+        }
+      }
+
+      return newLine + "\n\n" + text;
+    }
+
+    function updatedHpi() {
+      return replaceStudentLine(state.oldHpi, buildStudentLine());
+    }
+
+    function setStatus(text, connected) {
+      els.statusPill.textContent = text;
+      els.statusPill.className = "status " + (connected ? "connected" : "waiting");
+    }
+
+    function showError(message) {
+      els.errorBox.textContent = message || "";
+    }
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      window.clearTimeout(showToast._t);
+      showToast._t = window.setTimeout(() => els.toast.classList.remove("show"), 1400);
+    }
+
+    async function copyText(text, label) {
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      showToast("Copied " + label);
+    }
+
+    async function apiUpdate(payload) {
+      const res = await fetch("/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Update failed");
+      }
+    }
+
+    async function addStudent() {
+      await apiUpdate({ action: "addStudent" });
+    }
+
+    async function updateStudentName(studentId, name) {
+      await apiUpdate({ action: "updateStudentName", studentId, name });
+    }
+
+    async function deleteStudent(studentId) {
+      await apiUpdate({ action: "deleteStudent", studentId });
+    }
+
+    async function resetBoard() {
+      if (!confirm("Reset the shared board for everyone?")) return;
+      await apiUpdate({ action: "resetBoard" });
+    }
+
+    async function setPatientCount(count) {
+      await apiUpdate({ action: "setPatientCount", count });
+    }
+
+    async function updatePatientRole(patientId, roleKey, studentId) {
+      await apiUpdate({ action: "updatePatientRole", patientId, roleKey, studentId });
+    }
+
+    async function randomizePatient(patientId) {
+      await apiUpdate({ action: "randomizePatient", patientId });
+    }
+
+    async function randomizeSchedule() {
+      await apiUpdate({ action: "randomizeSchedule" });
+    }
+
+    async function clearScheduleAssignments() {
+      await apiUpdate({ action: "clearScheduleAssignments" });
+    }
+
+    async function setSelectedPatient(patientId) {
+      await apiUpdate({ action: "setSelectedPatient", patientId });
+    }
+
+    async function connectBoard() {
+      try {
+        if (state.eventSource) state.eventSource.close();
+
+        setStatus("Connecting", false);
+        showError("");
+
+        const source = new EventSource("/events");
+        state.eventSource = source;
+
+        source.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          state.students = Array.isArray(data.students) ? data.students : [];
+          state.patients = Array.isArray(data.patients) ? data.patients : [];
+          state.selectedPatientId = data.selectedPatientId || "";
+          state.updatedAt = data.updatedAt || null;
+          render();
+          setStatus("Connected", true);
+        };
+
+        source.onerror = () => {
+          setStatus("Trying to reconnect", false);
+        };
+
+        const res = await fetch("/state");
+        const data = await res.json();
+        state.students = Array.isArray(data.students) ? data.students : [];
+        state.patients = Array.isArray(data.patients) ? data.patients : [];
+        state.selectedPatientId = data.selectedPatientId || "";
+        state.updatedAt = data.updatedAt || null;
+        render();
+        setStatus("Connected", true);
+      } catch (err) {
+        showError(err.message || "Could not connect");
+        setStatus("Connection failed", false);
+      }
+    }
+
+    function renderStudents() {
+      const students = [...state.students].sort((a, b) => (a.order || 0) - (b.order || 0));
+      els.studentsList.innerHTML = "";
+
+      if (!students.length) {
+        const div = document.createElement("div");
+        div.className = "empty";
+        div.textContent = "No students yet. Click Add student.";
+        els.studentsList.appendChild(div);
+        return;
+      }
+
+      students.forEach((student, index) => {
+        const row = document.createElement("div");
+        row.className = "row-2";
+
+        const labelWrap = document.createElement("label");
+        labelWrap.className = "row";
+
+        const label = document.createElement("span");
+        label.className = "label";
+        label.textContent = "Student " + (index + 1);
+
+        const input = document.createElement("input");
+        input.value = student.name || "";
+        input.placeholder = "Full name";
+        input.dataset.studentId = student.id;
+        input.addEventListener("input", (e) => {
+          const nextValue = e.target.value;
+          window.clearTimeout(state.nameInputTimers[student.id]);
+          state.nameInputTimers[student.id] = window.setTimeout(() => {
+            updateStudentName(student.id, nextValue).catch((err) => showError(err.message || "Update failed"));
+          }, 150);
+        });
+
+        labelWrap.appendChild(label);
+        labelWrap.appendChild(input);
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-danger";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", () => {
+          deleteStudent(student.id).catch((err) => showError(err.message || "Delete failed"));
+        });
+
+        row.appendChild(labelWrap);
+        row.appendChild(removeBtn);
+        els.studentsList.appendChild(row);
+      });
+    }
+
+    function renderSelectedPatientControl() {
+      els.selectedPatientSelect.innerHTML = "";
+      if (!state.patients.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No patients yet";
+        els.selectedPatientSelect.appendChild(option);
+        els.selectedPatientSelect.disabled = true;
+        return;
+      }
+
+      els.selectedPatientSelect.disabled = false;
+      state.patients.forEach((patient) => {
+        const option = document.createElement("option");
+        option.value = patient.id;
+        option.textContent = patient.label;
+        els.selectedPatientSelect.appendChild(option);
+      });
+
+      const selected = state.patients.some((patient) => patient.id === state.selectedPatientId)
+        ? state.selectedPatientId
+        : state.patients[0].id;
+
+      els.selectedPatientSelect.value = selected;
+    }
+
+    function renderPatientsTable() {
+      els.patientsTableBody.innerHTML = "";
+      els.patientCountInput.value = state.patients.length ? String(state.patients.length) : "";
+
+      if (!state.patients.length) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 8;
+        cell.innerHTML = '<div class="empty">Set the patient count to populate Patient 1, Patient 2, and so on.</div>';
+        row.appendChild(cell);
+        els.patientsTableBody.appendChild(row);
+        return;
+      }
+
+      const students = availableStudents();
+
+      state.patients.forEach((patient) => {
+        const row = document.createElement("tr");
+
+        const labelCell = document.createElement("td");
+        labelCell.className = "patient-label-cell";
+        labelCell.textContent = patient.label;
+        row.appendChild(labelCell);
+
+        ROLE_KEYS.forEach((roleKey) => {
+          const cell = document.createElement("td");
+          const select = document.createElement("select");
+          select.dataset.patientId = patient.id;
+          select.dataset.roleKey = roleKey;
+
+          const blank = document.createElement("option");
+          blank.value = "";
+          blank.textContent = "Unassigned";
+          select.appendChild(blank);
+
+          students.forEach((student) => {
+            const option = document.createElement("option");
+            option.value = student.id;
+            option.textContent = student.name;
+            select.appendChild(option);
+          });
+
+          select.value = patient.assignments?.[roleKey] || "";
+          select.addEventListener("change", (e) => {
+            updatePatientRole(patient.id, roleKey, e.target.value).catch((err) => showError(err.message || "Role assignment failed"));
+          });
+
+          cell.appendChild(select);
+          row.appendChild(cell);
+        });
+
+        const actionCell = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.className = "btn-soft mini-btn";
+        btn.textContent = "Randomize row";
+        btn.addEventListener("click", () => {
+          randomizePatient(patient.id).catch((err) => showError(err.message || "Could not randomize row"));
+        });
+        actionCell.appendChild(btn);
+        row.appendChild(actionCell);
+
+        els.patientsTableBody.appendChild(row);
+      });
+    }
+
+    function renderHeader() {
+      const line = buildStudentLine();
+      els.studentLine.textContent = line || "Add patients and assign roles.";
+      els.updatedHpi.value = updatedHpi();
+
+      if (state.updatedAt) {
+        els.lastSync.textContent = "Last sync: " + new Date(state.updatedAt).toLocaleTimeString();
+      } else {
+        els.lastSync.textContent = "";
+      }
+    }
+
+    function render() {
+      const focusSnapshot = getFocusSnapshot();
+      renderStudents();
+      renderPatientsTable();
+      renderSelectedPatientControl();
+      renderHeader();
+      restoreFocus(focusSnapshot);
+    }
+
+    function wireInputs() {
+      els.oldHpi.value = state.oldHpi;
+      els.oldHpi.addEventListener("input", () => {
+        state.oldHpi = els.oldHpi.value;
+        sessionStorage.setItem(LOCAL_HPI_KEY, state.oldHpi);
+        els.updatedHpi.value = updatedHpi();
+      });
+
+      els.addStudentBtn.addEventListener("click", () => {
+        addStudent().catch((err) => showError(err.message || "Add failed"));
+      });
+
+      els.copyStudentLineBtn.addEventListener("click", () => copyText(buildStudentLine(), "student line"));
+      els.copyUpdatedHpiBtn.addEventListener("click", () => copyText(updatedHpi(), "updated HPI"));
+      els.resetBoardBtn.addEventListener("click", () => {
+        resetBoard().catch((err) => showError(err.message || "Reset failed"));
+      });
+
+      els.applyPatientCountBtn.addEventListener("click", () => {
+        const count = Number(els.patientCountInput.value) || 0;
+        setPatientCount(count).catch((err) => showError(err.message || "Could not populate patients"));
+      });
+
+      els.patientCountInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const count = Number(els.patientCountInput.value) || 0;
+          setPatientCount(count).catch((err) => showError(err.message || "Could not populate patients"));
+        }
+      });
+
+      els.randomizeScheduleBtn.addEventListener("click", () => {
+        randomizeSchedule().catch((err) => showError(err.message || "Could not randomize schedule"));
+      });
+
+      els.clearScheduleAssignmentsBtn.addEventListener("click", () => {
+        clearScheduleAssignments().catch((err) => showError(err.message || "Could not clear assignments"));
+      });
+
+      els.selectedPatientSelect.addEventListener("change", (e) => {
+        setSelectedPatient(e.target.value).catch((err) => showError(err.message || "Could not change selected patient"));
+      });
+    }
+
+    render();
+    wireInputs();
+    connectBoard();
+  </script>
+</body>
+</html>
