@@ -83,7 +83,7 @@
     </div>
 
     <div class="banner">
-      <strong>Shared live for everyone:</strong> student names and patient role assignments.
+      <strong>Shared live for everyone:</strong> student names, custom role titles, and patient role assignments.
       <strong>Local only:</strong> pasted HPI and generated updated HPI.
       Only non-PHI should go into the shared board.
     </div>
@@ -133,7 +133,7 @@
       <section class="card">
         <div>
           <h2>Shared student list</h2>
-          <p class="helper">This syncs live for everyone with the app open.</p>
+          <p class="helper">This syncs live for everyone with the app open. Each person can also have a custom role title, like Medical Student or Premedical Student.</p>
         </div>
         <div class="buttons">
           <button class="btn" id="addStudentBtn">Add student</button>
@@ -227,16 +227,27 @@
       oldHpi: sessionStorage.getItem(LOCAL_HPI_KEY) || "",
       eventSource: null,
       nameInputTimers: {},
+      roleTitleInputTimers: {},
       localStudentNames: {},
+      localStudentRoleTitles: {},
     };
 
     function getFocusSnapshot() {
       const active = document.activeElement;
       if (!active) return null;
 
-      if (active.dataset.studentId) {
+      if (active.dataset.studentId && active.dataset.studentField === "name") {
         return {
-          type: "student",
+          type: "student-name",
+          id: active.dataset.studentId,
+          start: active.selectionStart,
+          end: active.selectionEnd,
+        };
+      }
+
+      if (active.dataset.studentId && active.dataset.studentField === "roleTitle") {
+        return {
+          type: "student-role-title",
           id: active.dataset.studentId,
           start: active.selectionStart,
           end: active.selectionEnd,
@@ -258,8 +269,10 @@
       if (!snapshot) return;
       let selector = "";
 
-      if (snapshot.type === "student") {
-        selector = `input[data-student-id="${snapshot.id}"]`;
+      if (snapshot.type === "student-name") {
+        selector = `input[data-student-id="${snapshot.id}"][data-student-field="name"]`;
+      } else if (snapshot.type === "student-role-title") {
+        selector = `input[data-student-id="${snapshot.id}"][data-student-field="roleTitle"]`;
       } else if (snapshot.type === "patient-role") {
         selector = `select[data-patient-id="${snapshot.patientId}"][data-role-key="${snapshot.roleKey}"]`;
       }
@@ -269,7 +282,7 @@
       if (!el) return;
 
       el.focus();
-      if (snapshot.type === "student" && typeof snapshot.start === "number" && typeof snapshot.end === "number") {
+      if ((snapshot.type === "student-name" || snapshot.type === "student-role-title") && typeof snapshot.start === "number" && typeof snapshot.end === "number") {
         try {
           el.setSelectionRange(snapshot.start, snapshot.end);
         } catch {}
@@ -283,9 +296,19 @@
           name: Object.prototype.hasOwnProperty.call(state.localStudentNames, student.id)
             ? state.localStudentNames[student.id]
             : (student.name || ""),
+          roleTitle: Object.prototype.hasOwnProperty.call(state.localStudentRoleTitles, student.id)
+            ? state.localStudentRoleTitles[student.id]
+            : (student.roleTitle || "Medical Student"),
         }))
         .filter((student) => (student.name || "").trim())
         .sort((a, b) => (a.order || 0) - (b.order || 0));
+    }
+
+    function joinWithCommasAnd(items) {
+      if (!items.length) return "";
+      if (items.length === 1) return items[0];
+      if (items.length === 2) return items[0] + " and " + items[1];
+      return items.slice(0, -1).join(", ") + ", and " + items[items.length - 1];
     }
 
     function getSelectedPatient() {
@@ -313,39 +336,56 @@ function reconcileLocalStudentNames(serverStudents) {
       if (!patient) return "";
 
       const assignments = patient.assignments || emptyRoleAssignments();
-      const studentMap = new Map();
-      const studentsById = new Map(state.students.map((student) => [
-        student.id,
-        {
-          ...student,
-          name: Object.prototype.hasOwnProperty.call(state.localStudentNames, student.id)
-            ? state.localStudentNames[student.id]
-            : (student.name || ""),
-        }
-      ]));
+      const studentsById = new Map(availableStudents().map((student) => [student.id, student]));
+      const included = [];
 
       ROLE_KEYS.forEach((roleKey) => {
         const studentId = assignments[roleKey];
         if (!studentId) return;
         const student = studentsById.get(studentId);
         if (!student || !(student.name || "").trim()) return;
-        if (!studentMap.has(studentId)) studentMap.set(studentId, []);
+        if (!included.some((entry) => entry.id === studentId)) {
+          included.push({
+            id: student.id,
+            name: (student.name || "").trim(),
+            roleTitle: (student.roleTitle || "Medical Student").trim() || "Medical Student",
+            taggedRoles: [],
+          });
+        }
+        const entry = included.find((item) => item.id === studentId);
         if (TAGGED_ROLE_KEYS.includes(roleKey)) {
-          studentMap.get(studentId).push(roleKey);
+          entry.taggedRoles.push(roleKey);
         }
       });
 
-      const ordered = availableStudents().filter((student) => studentMap.has(student.id) || (assignments.interviewer === student.id));
+      if (!included.length) return "";
 
-      const formatted = ordered.map((student) => {
-        const tags = (studentMap.get(student.id) || []).map((roleKey) => ROLE_META[roleKey].suffix).join("");
-        return (student.name || "").trim() + tags;
-      }).filter(Boolean);
+      const orderedStudents = availableStudents()
+        .filter((student) => included.some((entry) => entry.id === student.id))
+        .map((student) => included.find((entry) => entry.id === student.id));
 
-      if (!formatted.length) return "";
-      if (formatted.length === 1) return "medical student " + formatted[0] + ".";
-      if (formatted.length === 2) return "medical students " + formatted[0] + " and " + formatted[1] + ".";
-      return "medical students " + formatted.slice(0, -1).join(", ") + ", and " + formatted[formatted.length - 1] + ".";
+      const groups = [];
+      orderedStudents.forEach((student) => {
+        let group = groups.find((item) => item.roleTitle === student.roleTitle);
+        if (!group) {
+          group = { roleTitle: student.roleTitle, students: [] };
+          groups.push(group);
+        }
+        group.students.push(student);
+      });
+
+      const groupPhrases = groups.map((group) => {
+        const roleLabel = (group.roleTitle || "Medical Student").trim() || "Medical Student";
+        const names = joinWithCommasAnd(
+          group.students.map((student) => {
+            const suffixes = student.taggedRoles.map((roleKey) => ROLE_META[roleKey].suffix).join("");
+            return student.name + suffixes;
+          })
+        );
+        return roleLabel + " " + names;
+      });
+
+      return joinWithCommasAnd(groupPhrases) + ".";
     }
 
     function replaceStudentLine(text, newLine) {
@@ -418,6 +458,10 @@ function reconcileLocalStudentNames(serverStudents) {
       await apiUpdate({ action: "updateStudentName", studentId, name });
     }
 
+    async function updateStudentRoleTitle(studentId, roleTitle) {
+      await apiUpdate({ action: "updateStudentRoleTitle", studentId, roleTitle });
+    }
+
     async function deleteStudent(studentId) {
       delete state.localStudentNames[studentId];
       await apiUpdate({ action: "deleteStudent", studentId });
@@ -466,6 +510,7 @@ function reconcileLocalStudentNames(serverStudents) {
           const data = JSON.parse(event.data);
           const nextStudents = Array.isArray(data.students) ? data.students : [];
           reconcileLocalStudentNames(nextStudents);
+          reconcileLocalStudentRoleTitles(nextStudents);
           state.students = nextStudents;
           state.patients = Array.isArray(data.patients) ? data.patients : [];
           state.selectedPatientId = data.selectedPatientId || "";
@@ -508,24 +553,30 @@ function reconcileLocalStudentNames(serverStudents) {
 
       students.forEach((student, index) => {
         const row = document.createElement("div");
-        row.className = "row-2";
+        row.className = "row";
+        row.style.padding = "10px 0";
+        row.style.borderBottom = "1px solid #e2e8f0";
 
-        const labelWrap = document.createElement("label");
-        labelWrap.className = "row";
+        const top = document.createElement("div");
+        top.className = "row-2";
 
-        const label = document.createElement("span");
-        label.className = "label";
-        label.textContent = "Student " + (index + 1);
+        const nameWrap = document.createElement("label");
+        nameWrap.className = "row";
+
+        const nameLabel = document.createElement("span");
+        nameLabel.className = "label";
+        nameLabel.textContent = "Student " + (index + 1) + " name";
 
         const displayName = Object.prototype.hasOwnProperty.call(state.localStudentNames, student.id)
           ? state.localStudentNames[student.id]
           : (student.name || "");
 
-        const input = document.createElement("input");
-        input.value = displayName;
-        input.placeholder = "Full name";
-        input.dataset.studentId = student.id;
-        input.addEventListener("input", (e) => {
+        const nameInput = document.createElement("input");
+        nameInput.value = displayName;
+        nameInput.placeholder = "Full name";
+        nameInput.dataset.studentId = student.id;
+        nameInput.dataset.studentField = "name";
+        nameInput.addEventListener("input", (e) => {
           const nextValue = e.target.value;
           state.localStudentNames[student.id] = nextValue;
           window.clearTimeout(state.nameInputTimers[student.id]);
@@ -534,8 +585,8 @@ function reconcileLocalStudentNames(serverStudents) {
           }, 150);
         });
 
-        labelWrap.appendChild(label);
-        labelWrap.appendChild(input);
+        nameWrap.appendChild(nameLabel);
+        nameWrap.appendChild(nameInput);
 
         const removeBtn = document.createElement("button");
         removeBtn.className = "btn-danger";
@@ -544,8 +595,39 @@ function reconcileLocalStudentNames(serverStudents) {
           deleteStudent(student.id).catch((err) => showError(err.message || "Delete failed"));
         });
 
-        row.appendChild(labelWrap);
-        row.appendChild(removeBtn);
+        top.appendChild(nameWrap);
+        top.appendChild(removeBtn);
+
+        const roleWrap = document.createElement("label");
+        roleWrap.className = "row";
+
+        const roleLabel = document.createElement("span");
+        roleLabel.className = "label";
+        roleLabel.textContent = "Displayed role title";
+
+        const displayRoleTitle = Object.prototype.hasOwnProperty.call(state.localStudentRoleTitles, student.id)
+          ? state.localStudentRoleTitles[student.id]
+          : (student.roleTitle || "Medical Student");
+
+        const roleInput = document.createElement("input");
+        roleInput.value = displayRoleTitle;
+        roleInput.placeholder = "Medical Student";
+        roleInput.dataset.studentId = student.id;
+        roleInput.dataset.studentField = "roleTitle";
+        roleInput.addEventListener("input", (e) => {
+          const nextValue = e.target.value;
+          state.localStudentRoleTitles[student.id] = nextValue;
+          window.clearTimeout(state.roleTitleInputTimers[student.id]);
+          state.roleTitleInputTimers[student.id] = window.setTimeout(() => {
+            updateStudentRoleTitle(student.id, nextValue).catch((err) => showError(err.message || "Update failed"));
+          }, 150);
+        });
+
+        roleWrap.appendChild(roleLabel);
+        roleWrap.appendChild(roleInput);
+
+        row.appendChild(top);
+        row.appendChild(roleWrap);
         els.studentsList.appendChild(row);
       });
     }

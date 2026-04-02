@@ -58,7 +58,14 @@ function loadState() {
       : (patients[0]?.id || "");
 
     return {
-      students: Array.isArray(parsed.students) ? parsed.students : [],
+      students: Array.isArray(parsed.students)
+        ? parsed.students.map((student, index) => ({
+            id: student?.id || randomUUID(),
+            name: student?.name || "",
+            roleTitle: (student?.roleTitle || "Medical Student"),
+            order: Number.isFinite(student?.order) ? student.order : index,
+          }))
+        : [],
       patients,
       selectedPatientId,
       updatedAt: parsed.updatedAt || Date.now(),
@@ -278,6 +285,7 @@ async function handleUpdate(req, res) {
     state.students.push({
       id: randomUUID(),
       name: "",
+      roleTitle: "Medical Student",
       order: state.students.length,
     });
   } else if (action === "updateStudentName") {
@@ -287,6 +295,13 @@ async function handleUpdate(req, res) {
       return;
     }
     student.name = String(body.name || "");
+  } else if (action === "updateStudentRoleTitle") {
+    const student = state.students.find((s) => s.id === body.studentId);
+    if (!student) {
+      sendJson(res, 404, { error: "Student not found" });
+      return;
+    }
+    student.roleTitle = String(body.roleTitle || "").trim() || "Medical Student";
   } else if (action === "deleteStudent") {
     state.students = state.students.filter((s) => s.id !== body.studentId);
     state.patients = state.patients.map((patient) => {
