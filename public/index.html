@@ -227,6 +227,7 @@
       oldHpi: sessionStorage.getItem(LOCAL_HPI_KEY) || "",
       eventSource: null,
       nameInputTimers: {},
+      localStudentNames: {},
     };
 
     function getFocusSnapshot() {
@@ -277,6 +278,12 @@
 
     function availableStudents() {
       return [...state.students]
+        .map((student) => ({
+          ...student,
+          name: Object.prototype.hasOwnProperty.call(state.localStudentNames, student.id)
+            ? state.localStudentNames[student.id]
+            : (student.name || ""),
+        }))
         .filter((student) => (student.name || "").trim())
         .sort((a, b) => (a.order || 0) - (b.order || 0));
     }
@@ -285,13 +292,37 @@
       return state.patients.find((patient) => patient.id === state.selectedPatientId) || state.patients[0] || null;
     }
 
+function reconcileLocalStudentNames(serverStudents) {
+  const serverMap = new Map((serverStudents || []).map((student) => [student.id, student.name || ""]));
+
+  for (const [studentId, localName] of Object.entries(state.localStudentNames)) {
+    if (!serverMap.has(studentId)) {
+      delete state.localStudentNames[studentId];
+      continue;
+    }
+
+    if ((serverMap.get(studentId) || "") === localName) {
+      delete state.localStudentNames[studentId];
+    }
+  }
+}
+
+
     function buildStudentLine() {
       const patient = getSelectedPatient();
       if (!patient) return "";
 
       const assignments = patient.assignments || emptyRoleAssignments();
       const studentMap = new Map();
-      const studentsById = new Map(state.students.map((student) => [student.id, student]));
+      const studentsById = new Map(state.students.map((student) => [
+        student.id,
+        {
+          ...student,
+          name: Object.prototype.hasOwnProperty.call(state.localStudentNames, student.id)
+            ? state.localStudentNames[student.id]
+            : (student.name || ""),
+        }
+      ]));
 
       ROLE_KEYS.forEach((roleKey) => {
         const studentId = assignments[roleKey];
@@ -388,6 +419,7 @@
     }
 
     async function deleteStudent(studentId) {
+      delete state.localStudentNames[studentId];
       await apiUpdate({ action: "deleteStudent", studentId });
     }
 
@@ -432,7 +464,9 @@
 
         source.onmessage = (event) => {
           const data = JSON.parse(event.data);
-          state.students = Array.isArray(data.students) ? data.students : [];
+          const nextStudents = Array.isArray(data.students) ? data.students : [];
+          reconcileLocalStudentNames(nextStudents);
+          state.students = nextStudents;
           state.patients = Array.isArray(data.patients) ? data.patients : [];
           state.selectedPatientId = data.selectedPatientId || "";
           state.updatedAt = data.updatedAt || null;
@@ -446,7 +480,9 @@
 
         const res = await fetch("/state");
         const data = await res.json();
-        state.students = Array.isArray(data.students) ? data.students : [];
+        const nextStudents = Array.isArray(data.students) ? data.students : [];
+        reconcileLocalStudentNames(nextStudents);
+        state.students = nextStudents;
         state.patients = Array.isArray(data.patients) ? data.patients : [];
         state.selectedPatientId = data.selectedPatientId || "";
         state.updatedAt = data.updatedAt || null;
@@ -481,12 +517,17 @@
         label.className = "label";
         label.textContent = "Student " + (index + 1);
 
+        const displayName = Object.prototype.hasOwnProperty.call(state.localStudentNames, student.id)
+          ? state.localStudentNames[student.id]
+          : (student.name || "");
+
         const input = document.createElement("input");
-        input.value = student.name || "";
+        input.value = displayName;
         input.placeholder = "Full name";
         input.dataset.studentId = student.id;
         input.addEventListener("input", (e) => {
           const nextValue = e.target.value;
+          state.localStudentNames[student.id] = nextValue;
           window.clearTimeout(state.nameInputTimers[student.id]);
           state.nameInputTimers[student.id] = window.setTimeout(() => {
             updateStudentName(student.id, nextValue).catch((err) => showError(err.message || "Update failed"));
