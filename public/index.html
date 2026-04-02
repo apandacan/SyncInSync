@@ -437,6 +437,18 @@ function reconcileLocalStudentNames(serverStudents) {
       showToast("Copied " + label);
     }
 
+    function applyServerState(data) {
+      const nextStudents = Array.isArray(data.students) ? data.students : [];
+      reconcileLocalStudentNames(nextStudents);
+      reconcileLocalStudentRoleTitles(nextStudents);
+      state.students = nextStudents;
+      state.patients = Array.isArray(data.patients) ? data.patients : [];
+      state.selectedPatientId = data.selectedPatientId || "";
+      state.updatedAt = data.updatedAt || null;
+      render();
+      setStatus("Connected", true);
+    }
+
     async function apiUpdate(payload) {
       const res = await fetch("/update", {
         method: "POST",
@@ -444,9 +456,14 @@ function reconcileLocalStudentNames(serverStudents) {
         body: JSON.stringify(payload),
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Update failed");
+      }
+
+      if (data && data.state) {
+        applyServerState(data.state);
       }
     }
 
@@ -508,15 +525,7 @@ function reconcileLocalStudentNames(serverStudents) {
 
         source.onmessage = (event) => {
           const data = JSON.parse(event.data);
-          const nextStudents = Array.isArray(data.students) ? data.students : [];
-          reconcileLocalStudentNames(nextStudents);
-          reconcileLocalStudentRoleTitles(nextStudents);
-          state.students = nextStudents;
-          state.patients = Array.isArray(data.patients) ? data.patients : [];
-          state.selectedPatientId = data.selectedPatientId || "";
-          state.updatedAt = data.updatedAt || null;
-          render();
-          setStatus("Connected", true);
+          applyServerState(data);
         };
 
         source.onerror = () => {
@@ -525,14 +534,7 @@ function reconcileLocalStudentNames(serverStudents) {
 
         const res = await fetch("/state");
         const data = await res.json();
-        const nextStudents = Array.isArray(data.students) ? data.students : [];
-        reconcileLocalStudentNames(nextStudents);
-        state.students = nextStudents;
-        state.patients = Array.isArray(data.patients) ? data.patients : [];
-        state.selectedPatientId = data.selectedPatientId || "";
-        state.updatedAt = data.updatedAt || null;
-        render();
-        setStatus("Connected", true);
+        applyServerState(data);
       } catch (err) {
         showError(err.message || "Could not connect");
         setStatus("Connection failed", false);
