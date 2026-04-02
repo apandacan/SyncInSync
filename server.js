@@ -154,27 +154,113 @@ function sortedStudents() {
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 
+function shuffleInPlace(items) {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+function roleCoverageCounts(excludedPatientId = "") {
+  const counts = {};
+  for (const roleKey of ROLE_KEYS) {
+    counts[roleKey] = {};
+  }
+
+  for (const patient of state.patients) {
+    if (excludedPatientId && patient.id === excludedPatientId) continue;
+    for (const roleKey of ROLE_KEYS) {
+      const studentId = patient.assignments?.[roleKey];
+      if (!studentId) continue;
+      counts[roleKey][studentId] = (counts[roleKey][studentId] || 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
+function pickStudentForRole(roleKey, available, coverage, usedThisRow) {
+  const shuffled = shuffleInPlace([...available]);
+  const counts = coverage[roleKey] || {};
+
+  let best = null;
+  let bestScore = Infinity;
+  let bestUsedPenalty = Infinity;
+
+  for (const student of shuffled) {
+    const count = counts[student.id] || 0;
+    const usedPenalty = usedThisRow.has(student.id) ? 1 : 0;
+
+    if (
+      count < bestScore ||
+      (count === bestScore && usedPenalty < bestUsedPenalty)
+    ) {
+      best = student;
+      bestScore = count;
+      bestUsedPenalty = usedPenalty;
+    }
+  }
+
+  return best;
+}
+
 function randomizePatient(patient) {
   const available = sortedStudents();
   if (!available.length) return;
 
-  const pool = [...available];
-  for (let i = pool.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-
-  const keys = [...ROLE_KEYS];
-  for (let i = keys.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [keys[i], keys[j]] = [keys[j], keys[i]];
-  }
-
+  const coverage = roleCoverageCounts(patient.id);
   const assignments = emptyRoleAssignments();
-  keys.forEach((roleKey, index) => {
-    assignments[roleKey] = pool[index % pool.length].id;
-  });
+  const usedThisRow = new Set();
+
+  for (const roleKey of ROLE_KEYS) {
+    const chosen = pickStudentForRole(roleKey, available, coverage, usedThisRow);
+    if (!chosen) continue;
+    assignments[roleKey] = chosen.id;
+    usedThisRow.add(chosen.id);
+    coverage[roleKey][chosen.id] = (coverage[roleKey][chosen.id] || 0) + 1;
+  }
+
   patient.assignments = assignments;
+}
+
+function randomizeScheduleBalanced() {
+  const available = sortedStudents();
+  if (!available.length || !state.patients.length) return;
+
+  const roleOrders = {};
+  for (const roleKey of ROLE_KEYS) {
+    roleOrders[roleKey] = shuffleInPlace([...available]).map((student) => student.id);
+  }
+
+  const patients = [...state.patients];
+  shuffleInPlace(patients);
+
+  patients.forEach((patient, patientIndex) => {
+    const assignments = emptyRoleAssignments();
+    const usedThisRow = new Set();
+
+    for (const roleKey of ROLE_KEYS) {
+      const order = roleOrders[roleKey];
+      let chosenId = "";
+      for (let offset = 0; offset < order.length; offset += 1) {
+        const candidateId = order[(patientIndex + offset) % order.length];
+        if (!usedThisRow.has(candidateId)) {
+          chosenId = candidateId;
+          break;
+        }
+      }
+
+      if (!chosenId) {
+        chosenId = order[patientIndex % order.length] || "";
+      }
+
+      assignments[roleKey] = chosenId;
+      if (chosenId) usedThisRow.add(chosenId);
+    }
+
+    patient.assignments = assignments;
+  });
 }
 
 async function handleUpdate(req, res) {
@@ -244,7 +330,7 @@ async function handleUpdate(req, res) {
     }
     randomizePatient(patient);
   } else if (action === "randomizeSchedule") {
-    state.patients.forEach((patient) => randomizePatient(patient));
+    randomizeScheduleBalanced();
   } else if (action === "clearScheduleAssignments") {
     state.patients = state.patients.map((patient) => ({
       ...patient,
