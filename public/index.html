@@ -68,7 +68,11 @@
     .patient-clickable-row { cursor: pointer; }
     .patient-clickable-row.selected-row td { background: #eff6ff; }
     .patient-clickable-row.selected-row td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
+    .patient-clickable-row.ended-row td { background: #f1f5f9; color: #64748b; }
+    .patient-clickable-row.ended-row .patient-label-cell { text-decoration: line-through; }
+    .patient-clickable-row.ended-row select { background: #f8fafc; color: #64748b; }
     .mini-btn { padding: 9px 11px; border-radius: 12px; font-size: 13px; }
+    .mini-btn-danger { background: #fee2e2; color: #991b1b; }
     @media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -147,7 +151,7 @@
       <section class="card">
         <div>
           <h2>Local-only HPI box</h2>
-          <p class="helper">Pick which patient row should drive the note line. You can use the dropdown or click a patient row in the assignment board. Interviewer is included in the list if assigned, but does not get a tag.</p>
+          <p class="helper">You can use the dropdown or click a patient row in the assignment board to choose which one drives the note line. Interviewer is included in the list if assigned, but does not get a tag.</p>
         </div>
 
         <label>
@@ -532,6 +536,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
       await apiUpdate({ action: "setSelectedPatient", patientId });
     }
 
+    async function togglePatientEnded(patientId) {
+      await apiUpdate({ action: "togglePatientEnded", patientId });
+    }
+
     async function connectBoard() {
       try {
         if (state.eventSource) state.eventSource.close();
@@ -697,7 +705,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
 
       state.patients.forEach((patient) => {
         const row = document.createElement("tr");
-        row.className = "patient-clickable-row" + (patient.id === state.selectedPatientId ? " selected-row" : "");
+        row.className =
+          "patient-clickable-row" +
+          (patient.id === state.selectedPatientId ? " selected-row" : "") +
+          (patient.ended ? " ended-row" : "");
         row.addEventListener("click", (e) => {
           if (e.target.closest("select") || e.target.closest("button")) return;
           setSelectedPatient(patient.id).catch((err) => showError(err.message || "Could not change selected patient"));
@@ -740,6 +751,8 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
         });
 
         const actionCell = document.createElement("td");
+        actionCell.style.whiteSpace = "nowrap";
+
         const btn = document.createElement("button");
         btn.className = "btn-soft mini-btn";
         btn.textContent = "Randomize row";
@@ -747,7 +760,19 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
           e.stopPropagation();
           randomizePatient(patient.id).catch((err) => showError(err.message || "Could not randomize row"));
         });
+
+        const endBtn = document.createElement("button");
+        endBtn.className = "mini-btn mini-btn-danger";
+        endBtn.style.marginLeft = "8px";
+        endBtn.textContent = "X";
+        endBtn.title = patient.ended ? "Reopen encounter" : "End encounter";
+        endBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          togglePatientEnded(patient.id).catch((err) => showError(err.message || "Could not update encounter status"));
+        });
+
         actionCell.appendChild(btn);
+        actionCell.appendChild(endBtn);
         row.appendChild(actionCell);
 
         els.patientsTableBody.appendChild(row);

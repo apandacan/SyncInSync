@@ -42,6 +42,7 @@ function normalizePatient(patient, index) {
     id: patient?.id || randomUUID(),
     label: patient?.label || `Patient ${index + 1}`,
     assignments,
+    ended: Boolean(patient?.ended),
   };
 }
 
@@ -356,6 +357,13 @@ async function handleUpdate(req, res) {
     state.selectedPatientId = state.patients.some((p) => p.id === patientId)
       ? patientId
       : (state.patients[0]?.id || "");
+  } else if (action === "togglePatientEnded") {
+    const patient = state.patients.find((p) => p.id === body.patientId);
+    if (!patient) {
+      sendJson(res, 404, { error: "Patient not found" });
+      return;
+    }
+    patient.ended = !patient.ended;
   } else {
     sendJson(res, 400, { error: "Unknown action" });
     return;
