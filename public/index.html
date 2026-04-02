@@ -330,6 +330,21 @@ function reconcileLocalStudentNames(serverStudents) {
   }
 }
 
+function reconcileLocalStudentRoleTitles(serverStudents) {
+  const serverMap = new Map((serverStudents || []).map((student) => [student.id, student.roleTitle || "Medical Student"]));
+
+  for (const [studentId, localRoleTitle] of Object.entries(state.localStudentRoleTitles || {})) {
+    if (!serverMap.has(studentId)) {
+      delete state.localStudentRoleTitles[studentId];
+      continue;
+    }
+
+    if ((serverMap.get(studentId) || "Medical Student") === localRoleTitle) {
+      delete state.localStudentRoleTitles[studentId];
+    }
+  }
+}
+
 
     function buildStudentLine() {
       const patient = getSelectedPatient();
@@ -481,6 +496,7 @@ function reconcileLocalStudentNames(serverStudents) {
 
     async function deleteStudent(studentId) {
       delete state.localStudentNames[studentId];
+      delete state.localStudentRoleTitles[studentId];
       await apiUpdate({ action: "deleteStudent", studentId });
     }
 
