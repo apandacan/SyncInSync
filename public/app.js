@@ -662,8 +662,12 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
             updatePatientRole(patient.id, roleKey, nextStudentId).catch((err) => showError(err.message || "Role assignment failed"));
           });
 
-          cell.appendChild(select);
-          cell.appendChild(selfBtn);
+          const inlineWrap = document.createElement("div");
+          inlineWrap.className = "role-cell-inline";
+          inlineWrap.appendChild(selfBtn);
+          inlineWrap.appendChild(select);
+
+          cell.appendChild(inlineWrap);
           row.appendChild(cell);
         });
 
