@@ -72,23 +72,16 @@
     .footer-note { text-align: center; color: #64748b; font-size: 13px; padding-top: 4px; }
     .heart-red { color: #dc2626; }
 
-20% { transform: translateY(-2px) rotate(-0.35deg); }
-      50% { transform: translateY(0px) rotate(0.2deg); }
-      80% { transform: translateY(2px) rotate(-0.2deg); }
-      100% { transform: translateY(0px) rotate(0deg); }
-    }
-
-
 .identity-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(15, 23, 42, 0.6);
   display: none;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 50;
-  backdrop-filter: blur(4px);
+  z-index: 9999;
+  backdrop-filter: blur(6px);
 }
 .identity-overlay.show {
   display: flex;
@@ -96,17 +89,19 @@
 .identity-card {
   position: relative;
   width: 100%;
-  max-width: 480px;
-  border-radius: 28px;
-  padding: 3px;
+  max-width: 500px;
+  border-radius: 30px;
+  padding: 4px;
   overflow: visible;
-  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.28);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.3);
   animation: popupFloat 3.6s ease-in-out infinite;
+  isolation: isolate;
 }
 .identity-card::before {
   content: "";
   position: absolute;
-  inset: -35%;
+  inset: -10px;
+  border-radius: 34px;
   background: conic-gradient(
     from 0deg,
     #60a5fa,
@@ -116,49 +111,46 @@
     #60a5fa
   );
   animation: spinBorder 7s linear infinite;
-  transform-origin: center;
-  filter: saturate(1.1) brightness(1.05);
-  border-radius: 50%;
-  z-index: 0;
+  z-index: -2;
+  filter: saturate(1.15) brightness(1.05);
 }
 .identity-card::after {
   content: "";
   position: absolute;
-  inset: -42px;
-  border-radius: 34px;
+  inset: -46px;
+  border-radius: 42px;
   background:
     repeating-conic-gradient(
       from 0deg,
-      rgba(250, 204, 21, 0.95) 0deg 8deg,
-      rgba(250, 204, 21, 0) 8deg 24deg
+      rgba(250, 204, 21, 0.98) 0deg 4deg,
+      rgba(250, 204, 21, 0.10) 4deg 10deg,
+      rgba(250, 204, 21, 0) 10deg 24deg
     );
-  mask:
-    radial-gradient(
-      farthest-side,
-      transparent calc(100% - 78px),
-      #000 calc(100% - 78px)
-    );
-  -webkit-mask:
-    radial-gradient(
-      farthest-side,
-      transparent calc(100% - 78px),
-      #000 calc(100% - 78px)
-    );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 84px),
+    #000 calc(100% - 84px)
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 84px),
+    #000 calc(100% - 84px)
+  );
+  animation: raySpinPulse 5.2s ease-in-out infinite;
   transform-origin: center;
-  animation: raySpinPulse 4.8s ease-in-out infinite;
-  filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.35));
   pointer-events: none;
-  z-index: 0;
+  z-index: -3;
+  filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.45));
 }
 .identity-card-inner {
   position: relative;
   z-index: 1;
-  background: rgba(255, 255, 255, 0.97);
-  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 26px;
   padding: 24px;
   display: grid;
   gap: 14px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
 }
 .identity-title {
   font-size: 24px;
@@ -174,16 +166,16 @@
 }
 @keyframes raySpinPulse {
   0% {
-    transform: rotate(0deg) scale(0.96);
-    opacity: 0.82;
+    transform: rotate(0deg) scale(0.92);
+    opacity: 0.78;
   }
   50% {
-    transform: rotate(180deg) scale(1.05);
+    transform: rotate(180deg) scale(1.08);
     opacity: 1;
   }
   100% {
-    transform: rotate(360deg) scale(0.96);
-    opacity: 0.82;
+    transform: rotate(360deg) scale(0.92);
+    opacity: 0.78;
   }
 }
 @keyframes popupFloat {
@@ -193,23 +185,27 @@
   80% { transform: translateY(4px) rotate(-0.45deg); }
   100% { transform: translateY(0px) rotate(0deg); }
 }
-  20% { transform: translateY(-4px) rotate(-0.8deg); }
-  50% { transform: translateY(0px) rotate(0.45deg); }
-  80% { transform: translateY(4px) rotate(-0.45deg); }
-  100% { transform: translateY(0px) rotate(0deg); }
-}
-  20% { transform: translateY(-2px) rotate(-0.35deg); }
-  50% { transform: translateY(0px) rotate(0.2deg); }
-  80% { transform: translateY(2px) rotate(-0.2deg); }
-  100% { transform: translateY(0px) rotate(0deg); }
-}
 .mini-btn-self {
   background: #dcfce7;
   color: #166534;
-  margin-left: 8px;
+  margin-left: 0;
 }
 .mini-btn-self.active {
   background: #e5e7eb;
   color: #475569;
 }
 
+
+
+.role-cell-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.role-cell-inline select {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.role-cell-inline .mini-btn-self {
+  flex: 0 0 auto;
+}
