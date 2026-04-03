@@ -324,9 +324,10 @@ async function handleUpdate(req, res) {
       next.push(normalizePatient(prev, i));
     }
     state.patients = next;
-    state.selectedPatientId = state.patients.some((p) => p.id === state.selectedPatientId)
+    const selectable = state.patients.filter((p) => !p.ended);
+    state.selectedPatientId = selectable.some((p) => p.id === state.selectedPatientId)
       ? state.selectedPatientId
-      : (state.patients[0]?.id || "");
+      : (selectable[0]?.id || "");
   } else if (action === "updatePatientRole") {
     const patient = state.patients.find((p) => p.id === body.patientId);
     if (!patient) {
@@ -354,9 +355,10 @@ async function handleUpdate(req, res) {
     }));
   } else if (action === "setSelectedPatient") {
     const patientId = String(body.patientId || "");
-    state.selectedPatientId = state.patients.some((p) => p.id === patientId)
+    const selectable = state.patients.filter((p) => !p.ended);
+    state.selectedPatientId = selectable.some((p) => p.id === patientId)
       ? patientId
-      : (state.patients[0]?.id || "");
+      : (selectable[0]?.id || "");
   } else if (action === "togglePatientEnded") {
     const patient = state.patients.find((p) => p.id === body.patientId);
     if (!patient) {
@@ -364,6 +366,10 @@ async function handleUpdate(req, res) {
       return;
     }
     patient.ended = !patient.ended;
+    const selectable = state.patients.filter((p) => !p.ended);
+    if (!selectable.some((p) => p.id === state.selectedPatientId)) {
+      state.selectedPatientId = selectable[0]?.id || "";
+    }
   } else {
     sendJson(res, 400, { error: "Unknown action" });
     return;

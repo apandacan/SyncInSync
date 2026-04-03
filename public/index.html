@@ -68,9 +68,10 @@
     .patient-clickable-row { cursor: pointer; }
     .patient-clickable-row.selected-row td { background: #eff6ff; }
     .patient-clickable-row.selected-row td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
-    .patient-clickable-row.ended-row td { background: #f1f5f9; color: #64748b; }
-    .patient-clickable-row.ended-row .patient-label-cell { text-decoration: line-through; }
-    .patient-clickable-row.ended-row select { background: #f8fafc; color: #64748b; }
+    .patient-clickable-row.ended-row td { background: #dbe4ee; color: #475569; text-decoration: line-through; text-decoration-thickness: 2px; }
+    .patient-clickable-row.ended-row .patient-label-cell { text-decoration: line-through; text-decoration-thickness: 2px; }
+    .patient-clickable-row.ended-row select { background: #e5e7eb; color: #475569; }
+    .patient-clickable-row.ended-row button { opacity: 0.9; }
     .mini-btn { padding: 9px 11px; border-radius: 12px; font-size: 13px; }
     .mini-btn-danger { background: #fee2e2; color: #991b1b; }
     @media (max-width: 980px) { .grid-2 { grid-template-columns: 1fr; } }
@@ -319,7 +320,8 @@
     }
 
     function getSelectedPatient() {
-      return state.patients.find((patient) => patient.id === state.selectedPatientId) || state.patients[0] || null;
+      const selectablePatients = state.patients.filter((patient) => !patient.ended);
+      return selectablePatients.find((patient) => patient.id === state.selectedPatientId) || selectablePatients[0] || null;
     }
 
 function reconcileLocalStudentNames(serverStudents) {
@@ -663,26 +665,28 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
 
     function renderSelectedPatientControl() {
       els.selectedPatientSelect.innerHTML = "";
-      if (!state.patients.length) {
+      const selectablePatients = state.patients.filter((patient) => !patient.ended);
+
+      if (!selectablePatients.length) {
         const option = document.createElement("option");
         option.value = "";
-        option.textContent = "No patients yet";
+        option.textContent = state.patients.length ? "No active patients available" : "No patients yet";
         els.selectedPatientSelect.appendChild(option);
         els.selectedPatientSelect.disabled = true;
         return;
       }
 
       els.selectedPatientSelect.disabled = false;
-      state.patients.forEach((patient) => {
+      selectablePatients.forEach((patient) => {
         const option = document.createElement("option");
         option.value = patient.id;
         option.textContent = patient.label;
         els.selectedPatientSelect.appendChild(option);
       });
 
-      const selected = state.patients.some((patient) => patient.id === state.selectedPatientId)
+      const selected = selectablePatients.some((patient) => patient.id === state.selectedPatientId)
         ? state.selectedPatientId
-        : state.patients[0].id;
+        : selectablePatients[0].id;
 
       els.selectedPatientSelect.value = selected;
     }
@@ -710,6 +714,7 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
           (patient.id === state.selectedPatientId ? " selected-row" : "") +
           (patient.ended ? " ended-row" : "");
         row.addEventListener("click", (e) => {
+          if (patient.ended) return;
           if (e.target.closest("select") || e.target.closest("button")) return;
           setSelectedPatient(patient.id).catch((err) => showError(err.message || "Could not change selected patient"));
         });
@@ -719,6 +724,7 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
         labelCell.textContent = patient.label;
         labelCell.addEventListener("click", (e) => {
           e.stopPropagation();
+          if (patient.ended) return;
           setSelectedPatient(patient.id).catch((err) => showError(err.message || "Could not change selected patient"));
         });
         row.appendChild(labelCell);
