@@ -179,20 +179,22 @@
 
   <div class="identity-overlay" id="identityOverlay">
     <div class="identity-card">
-      <div class="identity-title">Welcome</div>
-      <div class="identity-sub">Enter your name once so you can sign yourself up quickly. You can still add or edit students manually later.</div>
-      <label>
-        <span class="label">Your name</span>
-        <input id="identityNameInput" placeholder="Full name" />
-      </label>
-      <label>
-        <span class="label">Your role</span>
-        <input id="identityRoleInput" value="Medical Student" placeholder="Medical Student" />
-      </label>
-      <div class="buttons" style="justify-content:flex-end;">
-        <button class="btn" id="identitySaveBtn">Save and continue</button>
+      <div class="identity-card-inner">
+        <div class="identity-title">Welcome</div>
+        <div class="identity-sub">Enter your name once so you can sign yourself up quickly. You can still add or edit students manually later.</div>
+        <label>
+          <span class="label">Your name</span>
+          <input id="identityNameInput" placeholder="Full name" />
+        </label>
+        <label>
+          <span class="label">Your role</span>
+          <input id="identityRoleInput" value="Medical Student" placeholder="Medical Student" />
+        </label>
+        <div class="buttons" style="justify-content:flex-end;">
+          <button class="btn" id="identitySaveBtn">Save and continue</button>
+        </div>
+        <div class="error" id="identityError"></div>
       </div>
-      <div class="error" id="identityError"></div>
     </div>
   </div>
 
