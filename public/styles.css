@@ -72,13 +72,6 @@
     .footer-note { text-align: center; color: #64748b; font-size: 13px; padding-top: 4px; }
     .heart-red { color: #dc2626; }
 
-20% { transform: translateY(-2px) rotate(-0.35deg); }
-      50% { transform: translateY(0px) rotate(0.2deg); }
-      80% { transform: translateY(2px) rotate(-0.2deg); }
-      100% { transform: translateY(0px) rotate(0deg); }
-    }
-
-
 .identity-overlay {
   position: fixed;
   inset: 0;
@@ -151,7 +144,7 @@
 .mini-btn-self {
   background: #dcfce7;
   color: #166534;
-  margin-left: 8px;
+  margin-left: 0;
 }
 .mini-btn-self.active {
   background: #e5e7eb;
