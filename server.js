@@ -303,6 +303,34 @@ async function handleUpdate(req, res) {
       return;
     }
     student.roleTitle = String(body.roleTitle || "").trim() || "Medical Student";
+  } else if (action === "registerSelf") {
+    const name = String(body.name || "").trim();
+    const roleTitle = String(body.roleTitle || "").trim() || "Medical Student";
+    if (!name) {
+      sendJson(res, 400, { error: "Name is required" });
+      return;
+    }
+
+    let student = state.students.find((s) => s.id === body.studentId);
+    if (student) {
+      student.name = name;
+      student.roleTitle = roleTitle;
+    } else {
+      student = state.students.find((s) =>
+        String(s.name || "").trim().toLowerCase() === name.toLowerCase() &&
+        String(s.roleTitle || "Medical Student").trim().toLowerCase() === roleTitle.toLowerCase()
+      );
+      if (!student) {
+        student = {
+          id: randomUUID(),
+          name,
+          roleTitle,
+          order: state.students.length,
+        };
+        state.students.push(student);
+      }
+    }
+    body._registeredStudentId = student.id;
   } else if (action === "deleteStudent") {
     state.students = state.students.filter((s) => s.id !== body.studentId);
     state.patients = state.patients.map((patient) => {
@@ -355,10 +383,9 @@ async function handleUpdate(req, res) {
     }));
   } else if (action === "setSelectedPatient") {
     const patientId = String(body.patientId || "");
-    const selectable = state.patients.filter((p) => !p.ended);
-    state.selectedPatientId = selectable.some((p) => p.id === patientId)
+    state.selectedPatientId = state.patients.some((p) => p.id === patientId)
       ? patientId
-      : (selectable[0]?.id || "");
+      : (state.patients[0]?.id || "");
   } else if (action === "togglePatientEnded") {
     const patient = state.patients.find((p) => p.id === body.patientId);
     if (!patient) {
@@ -366,10 +393,6 @@ async function handleUpdate(req, res) {
       return;
     }
     patient.ended = !patient.ended;
-    const selectable = state.patients.filter((p) => !p.ended);
-    if (!selectable.some((p) => p.id === state.selectedPatientId)) {
-      state.selectedPatientId = selectable[0]?.id || "";
-    }
   } else {
     sendJson(res, 400, { error: "Unknown action" });
     return;
@@ -378,7 +401,7 @@ async function handleUpdate(req, res) {
   state.updatedAt = Date.now();
   saveState();
   broadcast();
-  sendJson(res, 200, { ok: true, state });
+  sendJson(res, 200, { ok: true, state, currentUserStudentId: body._registeredStudentId || null });
 }
 
 const server = http.createServer(async (req, res) => {

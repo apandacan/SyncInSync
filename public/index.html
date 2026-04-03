@@ -99,7 +99,7 @@
       <div class="topbar" style="align-items:center;">
         <div>
           <h2>Patient assignment board</h2>
-          <p class="helper">Patients are rows and roles are columns. You can sign up manually, randomize a single patient, or randomize the whole schedule.</p>
+          <p class="helper">Patients are rows and roles are columns. You can sign up manually, use the green person button to sign yourself up instantly, randomize a single patient, or randomize the whole schedule.</p>
         </div>
         <div class="status waiting" id="statusPill">Connecting</div>
       </div>
@@ -151,7 +151,7 @@
       <section class="card">
         <div>
           <h2>Local-only HPI box</h2>
-          <p class="helper">You can use the dropdown or click a patient row in the assignment board to choose which one drives the note line. Interviewer is included in the list if assigned, but does not get a tag.</p>
+          <p class="helper">You can use the dropdown or click an active patient row in the assignment board to choose which one drives the note line. Interviewer is included in the list if assigned, but does not get a tag.</p>
         </div>
 
         <label>
@@ -175,6 +175,25 @@
       </section>
     </div>
     <div style="text-align:center; color:#64748b; font-size:13px; padding-top:4px;">made with <span style="color:#dc2626;">❤</span> by DZ for Dr. Mao&apos;s rotation</div>
+  </div>
+
+  <div class="identity-overlay" id="identityOverlay">
+    <div class="identity-card">
+      <div class="identity-title">Welcome</div>
+      <div class="identity-sub">Enter your name once so you can sign yourself up quickly. You can still add or edit students manually later.</div>
+      <label>
+        <span class="label">Your name</span>
+        <input id="identityNameInput" placeholder="Full name" />
+      </label>
+      <label>
+        <span class="label">Your role</span>
+        <input id="identityRoleInput" value="Medical Student" placeholder="Medical Student" />
+      </label>
+      <div class="buttons" style="justify-content:flex-end;">
+        <button class="btn" id="identitySaveBtn">Save and continue</button>
+      </div>
+      <div class="error" id="identityError"></div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -204,6 +223,9 @@
     }
 
     const LOCAL_HPI_KEY = "insync-local-hpi-v1";
+    const LOCAL_CURRENT_USER_ID_KEY = "insync-current-user-id-v1";
+    const LOCAL_CURRENT_USER_NAME_KEY = "insync-current-user-name-v1";
+    const LOCAL_CURRENT_USER_ROLE_KEY = "insync-current-user-role-v1";
 
     const els = {
       studentsList: document.getElementById("studentsList"),
@@ -224,6 +246,11 @@
       copyStudentLineBtn: document.getElementById("copyStudentLineBtn"),
       copyUpdatedHpiBtn: document.getElementById("copyUpdatedHpiBtn"),
       resetBoardBtn: document.getElementById("resetBoardBtn"),
+      identityOverlay: document.getElementById("identityOverlay"),
+      identityNameInput: document.getElementById("identityNameInput"),
+      identityRoleInput: document.getElementById("identityRoleInput"),
+      identitySaveBtn: document.getElementById("identitySaveBtn"),
+      identityError: document.getElementById("identityError"),
     };
 
     let state = {
@@ -237,7 +264,34 @@
       roleTitleInputTimers: {},
       localStudentNames: {},
       localStudentRoleTitles: {},
+      currentUserStudentId: localStorage.getItem(LOCAL_CURRENT_USER_ID_KEY) || "",
+      currentUserName: localStorage.getItem(LOCAL_CURRENT_USER_NAME_KEY) || "",
+      currentUserRoleTitle: localStorage.getItem(LOCAL_CURRENT_USER_ROLE_KEY) || "Medical Student",
     };
+
+    function saveCurrentUserLocally() {
+      localStorage.setItem(LOCAL_CURRENT_USER_ID_KEY, state.currentUserStudentId || "");
+      localStorage.setItem(LOCAL_CURRENT_USER_NAME_KEY, state.currentUserName || "");
+      localStorage.setItem(LOCAL_CURRENT_USER_ROLE_KEY, state.currentUserRoleTitle || "Medical Student");
+    }
+
+    function clearCurrentUserLocally() {
+      state.currentUserStudentId = "";
+      localStorage.removeItem(LOCAL_CURRENT_USER_ID_KEY);
+    }
+
+    function openIdentityPrompt() {
+      els.identityNameInput.value = state.currentUserName || "";
+      els.identityRoleInput.value = state.currentUserRoleTitle || "Medical Student";
+      els.identityError.textContent = "";
+      els.identityOverlay.classList.add("show");
+      window.setTimeout(() => els.identityNameInput.focus(), 0);
+    }
+
+    function closeIdentityPrompt() {
+      els.identityOverlay.classList.remove("show");
+      els.identityError.textContent = "";
+    }
 
     function getFocusSnapshot() {
       const active = document.activeElement;
@@ -319,7 +373,8 @@
     }
 
     function getSelectedPatient() {
-      return state.patients.find((patient) => patient.id === state.selectedPatientId) || state.patients[0] || null;
+      const selectablePatients = state.patients.filter((patient) => !patient.ended);
+      return selectablePatients.find((patient) => patient.id === state.selectedPatientId) || selectablePatients[0] || null;
     }
 
 function reconcileLocalStudentNames(serverStudents) {
@@ -467,6 +522,22 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
       state.patients = Array.isArray(data.patients) ? data.patients : [];
       state.selectedPatientId = data.selectedPatientId || "";
       state.updatedAt = data.updatedAt || null;
+
+      if (state.currentUserStudentId) {
+        const existing = state.students.find((student) => student.id === state.currentUserStudentId);
+        if (!existing) {
+          clearCurrentUserLocally();
+          openIdentityPrompt();
+        } else {
+          state.currentUserName = existing.name || state.currentUserName || "";
+          state.currentUserRoleTitle = existing.roleTitle || state.currentUserRoleTitle || "Medical Student";
+          saveCurrentUserLocally();
+          closeIdentityPrompt();
+        }
+      } else {
+        openIdentityPrompt();
+      }
+
       render();
       setStatus("Connected", true);
     }
@@ -484,9 +555,16 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
         throw new Error(data.error || "Update failed");
       }
 
+      if (data && data.currentUserStudentId) {
+        state.currentUserStudentId = data.currentUserStudentId;
+        saveCurrentUserLocally();
+      }
+
       if (data && data.state) {
         applyServerState(data.state);
       }
+
+      return data;
     }
 
     async function addStudent() {
@@ -501,9 +579,28 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
       await apiUpdate({ action: "updateStudentRoleTitle", studentId, roleTitle });
     }
 
+    async function registerSelf(name, roleTitle) {
+      const data = await apiUpdate({
+        action: "registerSelf",
+        studentId: state.currentUserStudentId || "",
+        name,
+        roleTitle,
+      });
+
+      if (data && data.currentUserStudentId) {
+        state.currentUserStudentId = data.currentUserStudentId;
+      }
+      state.currentUserName = name;
+      state.currentUserRoleTitle = roleTitle || "Medical Student";
+      saveCurrentUserLocally();
+    }
+
     async function deleteStudent(studentId) {
       delete state.localStudentNames[studentId];
       delete state.localStudentRoleTitles[studentId];
+      if (state.currentUserStudentId === studentId) {
+        clearCurrentUserLocally();
+      }
       await apiUpdate({ action: "deleteStudent", studentId });
     }
 
@@ -663,26 +760,28 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
 
     function renderSelectedPatientControl() {
       els.selectedPatientSelect.innerHTML = "";
-      if (!state.patients.length) {
+      const selectablePatients = state.patients.filter((patient) => !patient.ended);
+
+      if (!selectablePatients.length) {
         const option = document.createElement("option");
         option.value = "";
-        option.textContent = "No patients yet";
+        option.textContent = state.patients.length ? "No active patients available" : "No patients yet";
         els.selectedPatientSelect.appendChild(option);
         els.selectedPatientSelect.disabled = true;
         return;
       }
 
       els.selectedPatientSelect.disabled = false;
-      state.patients.forEach((patient) => {
+      selectablePatients.forEach((patient) => {
         const option = document.createElement("option");
         option.value = patient.id;
         option.textContent = patient.label;
         els.selectedPatientSelect.appendChild(option);
       });
 
-      const selected = state.patients.some((patient) => patient.id === state.selectedPatientId)
+      const selected = selectablePatients.some((patient) => patient.id === state.selectedPatientId)
         ? state.selectedPatientId
-        : state.patients[0].id;
+        : selectablePatients[0].id;
 
       els.selectedPatientSelect.value = selected;
     }
@@ -710,6 +809,7 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
           (patient.id === state.selectedPatientId ? " selected-row" : "") +
           (patient.ended ? " ended-row" : "");
         row.addEventListener("click", (e) => {
+          if (patient.ended) return;
           if (e.target.closest("select") || e.target.closest("button")) return;
           setSelectedPatient(patient.id).catch((err) => showError(err.message || "Could not change selected patient"));
         });
@@ -719,6 +819,7 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
         labelCell.textContent = patient.label;
         labelCell.addEventListener("click", (e) => {
           e.stopPropagation();
+          if (patient.ended) return;
           setSelectedPatient(patient.id).catch((err) => showError(err.message || "Could not change selected patient"));
         });
         row.appendChild(labelCell);
@@ -746,7 +847,24 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
             updatePatientRole(patient.id, roleKey, e.target.value).catch((err) => showError(err.message || "Role assignment failed"));
           });
 
+          const selfBtn = document.createElement("button");
+          const isMine = !!state.currentUserStudentId && (patient.assignments?.[roleKey] === state.currentUserStudentId);
+          selfBtn.className = "mini-btn mini-btn-self" + (isMine ? " active" : "");
+          selfBtn.style.marginLeft = "8px";
+          selfBtn.textContent = "👤";
+          selfBtn.title = isMine ? "Remove yourself from this role" : "Sign yourself up for this role";
+          selfBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (!state.currentUserStudentId) {
+              openIdentityPrompt();
+              return;
+            }
+            const nextStudentId = isMine ? "" : state.currentUserStudentId;
+            updatePatientRole(patient.id, roleKey, nextStudentId).catch((err) => showError(err.message || "Role assignment failed"));
+          });
+
           cell.appendChild(select);
+          cell.appendChild(selfBtn);
           row.appendChild(cell);
         });
 
@@ -840,6 +958,20 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
 
       els.selectedPatientSelect.addEventListener("change", (e) => {
         setSelectedPatient(e.target.value).catch((err) => showError(err.message || "Could not change selected patient"));
+      });
+
+      els.identitySaveBtn.addEventListener("click", () => {
+        const name = (els.identityNameInput.value || "").trim();
+        const roleTitle = (els.identityRoleInput.value || "").trim() || "Medical Student";
+        if (!name) {
+          els.identityError.textContent = "Please enter your name.";
+          return;
+        }
+        registerSelf(name, roleTitle)
+          .then(() => closeIdentityPrompt())
+          .catch((err) => {
+            els.identityError.textContent = err.message || "Could not save your identity.";
+          });
       });
     }
 
