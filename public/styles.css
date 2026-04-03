@@ -86,7 +86,19 @@
 .identity-overlay.show {
   display: flex;
 }
+@property --border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@property --ray-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
 .identity-card {
+  --border-angle: 0deg;
+  --ray-angle: 0deg;
   position: relative;
   width: 100%;
   max-width: 500px;
@@ -103,44 +115,49 @@
   inset: -10px;
   border-radius: 34px;
   background: conic-gradient(
-    from 0deg,
+    from var(--border-angle),
     #60a5fa,
     #22c55e,
     #f59e0b,
     #ec4899,
     #60a5fa
   );
-  animation: spinBorder 7s linear infinite;
+  animation: borderHueSpin 7s linear infinite;
   z-index: -2;
   filter: saturate(1.15) brightness(1.05);
 }
 .identity-card::after {
   content: "";
   position: absolute;
-  inset: -46px;
-  border-radius: 42px;
+  inset: -88px;
+  border-radius: 50%;
   background:
+    radial-gradient(circle, rgba(250, 204, 21, 0.16) 0 28%, rgba(250, 204, 21, 0) 52%),
     repeating-conic-gradient(
-      from 0deg,
-      rgba(250, 204, 21, 0.98) 0deg 4deg,
-      rgba(250, 204, 21, 0.10) 4deg 10deg,
-      rgba(250, 204, 21, 0) 10deg 24deg
+      from var(--ray-angle),
+      rgba(250, 204, 21, 0.00) 0deg 8deg,
+      rgba(250, 204, 21, 0.18) 8deg 10deg,
+      rgba(255, 236, 179, 0.45) 10deg 11.2deg,
+      rgba(250, 204, 21, 0.14) 11.2deg 13deg,
+      rgba(250, 204, 21, 0.00) 13deg 26deg
     );
-  mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 84px),
-    #000 calc(100% - 84px)
-  );
-  -webkit-mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 84px),
-    #000 calc(100% - 84px)
-  );
-  animation: raySpinPulse 5.2s ease-in-out infinite;
-  transform-origin: center;
+  mask:
+    radial-gradient(circle,
+      transparent 0 25%,
+      rgba(0, 0, 0, 0.95) 36%,
+      rgba(0, 0, 0, 0) 68%
+    );
+  -webkit-mask:
+    radial-gradient(circle,
+      transparent 0 25%,
+      rgba(0, 0, 0, 0.95) 36%,
+      rgba(0, 0, 0, 0) 68%
+    );
+  animation: sunRayDrift 9s ease-in-out infinite;
   pointer-events: none;
   z-index: -3;
-  filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.45));
+  filter: blur(10px) drop-shadow(0 0 18px rgba(250, 204, 21, 0.22));
+  opacity: 0.95;
 }
 .identity-card-inner {
   position: relative;
@@ -160,21 +177,24 @@
   color: #64748b;
   line-height: 1.5;
 }
-@keyframes spinBorder {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes borderHueSpin {
+  from { --border-angle: 0deg; }
+  to { --border-angle: 360deg; }
 }
-@keyframes raySpinPulse {
+@keyframes sunRayDrift {
   0% {
-    transform: rotate(0deg) scale(0.92);
+    --ray-angle: 0deg;
+    transform: scale(0.97);
     opacity: 0.78;
   }
   50% {
-    transform: rotate(180deg) scale(1.08);
+    --ray-angle: 14deg;
+    transform: scale(1.04);
     opacity: 1;
   }
   100% {
-    transform: rotate(360deg) scale(0.92);
+    --ray-angle: 0deg;
+    transform: scale(0.97);
     opacity: 0.78;
   }
 }
@@ -195,17 +215,20 @@
   color: #475569;
 }
 
-
-
-.role-cell-inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.role-cell-stack {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 6px;
+  justify-items: stretch;
 }
-.role-cell-inline select {
+.role-cell-stack .mini-btn-self {
+  justify-self: center;
+  min-width: 38px;
+}
+.role-cell-stack select {
+  width: 100%;
   min-width: 0;
-  flex: 1 1 auto;
 }
-.role-cell-inline .mini-btn-self {
-  flex: 0 0 auto;
-}
+
+
+
