@@ -132,14 +132,14 @@
   inset: -88px;
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(250, 204, 21, 0.16) 0 28%, rgba(250, 204, 21, 0) 52%),
+    radial-gradient(circle, rgba(250, 204, 21, 0.30) 0 30%, rgba(250, 204, 21, 0) 56%),
     repeating-conic-gradient(
       from var(--ray-angle),
-      rgba(250, 204, 21, 0.00) 0deg 8deg,
-      rgba(250, 204, 21, 0.18) 8deg 10deg,
-      rgba(255, 236, 179, 0.45) 10deg 11.2deg,
-      rgba(250, 204, 21, 0.14) 11.2deg 13deg,
-      rgba(250, 204, 21, 0.00) 13deg 26deg
+      rgba(250, 204, 21, 0.00) 0deg 7deg,
+      rgba(250, 204, 21, 0.40) 7deg 10deg,
+      rgba(255, 244, 200, 0.92) 10deg 12.2deg,
+      rgba(250, 204, 21, 0.34) 12.2deg 15deg,
+      rgba(250, 204, 21, 0.00) 15deg 24deg
     );
   mask:
     radial-gradient(circle,
@@ -156,8 +156,8 @@
   animation: sunRayDrift 9s ease-in-out infinite;
   pointer-events: none;
   z-index: -3;
-  filter: blur(10px) drop-shadow(0 0 18px rgba(250, 204, 21, 0.22));
-  opacity: 0.95;
+  filter: blur(8px) drop-shadow(0 0 26px rgba(250, 204, 21, 0.48));
+  opacity: 1;
 }
 .identity-card-inner {
   position: relative;
@@ -185,7 +185,7 @@
   0% {
     --ray-angle: 0deg;
     transform: scale(0.97);
-    opacity: 0.78;
+    opacity: 0.92;
   }
   50% {
     --ray-angle: 14deg;
@@ -195,7 +195,7 @@
   100% {
     --ray-angle: 0deg;
     transform: scale(0.97);
-    opacity: 0.78;
+    opacity: 0.92;
   }
 }
 @keyframes popupFloat {
