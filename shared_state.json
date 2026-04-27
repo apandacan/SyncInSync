@@ -1,6 +1,123 @@
 {
-  "students": [],
-  "patients": [],
-  "selectedPatientId": "",
-  "updatedAt": 1777254552176
+  "students": [
+    {
+      "id": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+      "name": "Daniel Zheng",
+      "roleTitle": "Medical Student",
+      "order": 0
+    },
+    {
+      "id": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+      "name": "Michelle Miao",
+      "roleTitle": "Medical Student",
+      "order": 1
+    },
+    {
+      "id": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+      "name": "Grace Anderson",
+      "roleTitle": "Medical Student",
+      "order": 2
+    },
+    {
+      "id": "dec1bc92-e022-4781-ad5c-60fb17156ff2",
+      "name": "Rachel Gudimetla",
+      "roleTitle": "Pre-medical Student",
+      "order": 3
+    }
+  ],
+  "patients": [
+    {
+      "id": "292bf158-daa9-4b82-a46d-2f32a62730f6",
+      "label": "Patient 1",
+      "assignments": {
+        "interviewer": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "hpi": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "plan": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "mse": "dec1bc92-e022-4781-ad5c-60fb17156ff2",
+        "psychotherapy": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "meds": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4"
+      },
+      "ended": true
+    },
+    {
+      "id": "5b13d25d-5915-4eed-924f-4f925e8ff94c",
+      "label": "Patient 2",
+      "assignments": {
+        "interviewer": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "hpi": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "plan": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "mse": "dec1bc92-e022-4781-ad5c-60fb17156ff2",
+        "psychotherapy": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "meds": "f7e1b15c-9aeb-4110-918f-97beac9a7e13"
+      },
+      "ended": true
+    },
+    {
+      "id": "c2ed6a55-f1c3-4b95-992e-e70b84b57f23",
+      "label": "Patient 3",
+      "assignments": {
+        "interviewer": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "hpi": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "plan": "dec1bc92-e022-4781-ad5c-60fb17156ff2",
+        "mse": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "psychotherapy": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "meds": "dec1bc92-e022-4781-ad5c-60fb17156ff2"
+      },
+      "ended": true
+    },
+    {
+      "id": "68672103-291e-483e-996d-e90bd6708af5",
+      "label": "Patient 4",
+      "assignments": {
+        "interviewer": "dec1bc92-e022-4781-ad5c-60fb17156ff2",
+        "hpi": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "plan": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "mse": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "psychotherapy": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "meds": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4"
+      },
+      "ended": true
+    },
+    {
+      "id": "92e8a78e-f2fa-4023-87a9-a67545a153cd",
+      "label": "Patient 5",
+      "assignments": {
+        "interviewer": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "hpi": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "plan": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "mse": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "psychotherapy": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "meds": "dec1bc92-e022-4781-ad5c-60fb17156ff2"
+      },
+      "ended": false
+    },
+    {
+      "id": "f832d5fa-07bc-4a8f-9261-3f6df2d79c58",
+      "label": "Patient 6",
+      "assignments": {
+        "interviewer": "dec1bc92-e022-4781-ad5c-60fb17156ff2",
+        "hpi": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "plan": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "mse": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "psychotherapy": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "meds": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c"
+      },
+      "ended": false
+    },
+    {
+      "id": "cd56bcaa-4088-4184-8079-fcb11986348f",
+      "label": "Patient 7",
+      "assignments": {
+        "interviewer": "f7e1b15c-9aeb-4110-918f-97beac9a7e13",
+        "hpi": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c",
+        "plan": "454edbc1-0ea8-4e5c-87f0-ef60f37395c4",
+        "mse": "dec1bc92-e022-4781-ad5c-60fb17156ff2",
+        "psychotherapy": "dec1bc92-e022-4781-ad5c-60fb17156ff2",
+        "meds": "a9eea578-7bf6-46a2-8b94-ed1db9ae025c"
+      },
+      "ended": false
+    }
+  ],
+  "selectedPatientId": "92e8a78e-f2fa-4023-87a9-a67545a153cd",
+  "updatedAt": 1777331810789
 }

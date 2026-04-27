@@ -32,6 +32,7 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
     const STUDENT_GUIDE_PDF_URL = "/student-guide.pdf";
     const MSE_GUIDE_PDF_URL = "/mse-guide.pdf";
     const FOUR_PS_GUIDE_PDF_URL = "/4ps-guide.pdf";
+    const PLACING_MEDS_GUIDE_PDF_URL = "/placing-meds.pdf";
 
     const els = {
       studentsList: document.getElementById("studentsList"),
@@ -50,6 +51,7 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       errorBox: document.getElementById("errorBox"),
       toast: document.getElementById("toast"),
       addStudentBtn: document.getElementById("addStudentBtn"),
+      placingMedsGuideBtn: document.getElementById("placingMedsGuideBtn"),
       fourPsGuideBtn: document.getElementById("fourPsGuideBtn"),
       mseGuideBtn: document.getElementById("mseGuideBtn"),
       studentGuideBtn: document.getElementById("studentGuideBtn"),
@@ -952,6 +954,13 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
 
       els.addStudentBtn.addEventListener("click", () => {
         addStudent().catch((err) => showError(err.message || "Add failed"));
+      });
+
+      els.placingMedsGuideBtn.addEventListener("click", () => {
+        openStudentGuide("placing-meds-guide", "Placing Meds", PLACING_MEDS_GUIDE_PDF_URL).catch((err) => {
+          els.studentGuideStatus.textContent = err.message || "Could not open Placing Meds.";
+          els.studentGuideOverlay.classList.add("show");
+        });
       });
 
       els.fourPsGuideBtn.addEventListener("click", () => {
