@@ -1,4 +1,6 @@
-InSync Roles Sync, v6
+InSync Roles Sync
+Created by Daniel Zheng, MS3
+for Dr. Mao's Child Psych rotation at Baylor College of Medicine
 
 New in v6:
 - shared roles are moved into the patient assignment board
@@ -8,14 +10,6 @@ New in v6:
 - randomize button for each patient row
 - randomize entire schedule button
 - selected patient dropdown drives the generated student line and HPI updater
-
-How to run:
-1. Replace your old files with this version, or unzip into a new folder.
-2. Open a terminal in the folder.
-3. Run:
-   node server.js
-4. Open:
-   http://localhost:3000
 
 Notes:
 - names and patient role assignments are shared and persisted on the server
