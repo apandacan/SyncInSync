@@ -385,3 +385,39 @@
   min-width: 68px;
 }
 
+
+
+.guide-password-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 121;
+  backdrop-filter: blur(4px);
+}
+.guide-password-overlay.show {
+  display: flex;
+}
+.guide-password-modal {
+  width: min(420px, 92vw);
+  background: #fff;
+  border: 1px solid #dbe3ee;
+  border-radius: 22px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  padding: 22px;
+  display: grid;
+  gap: 14px;
+}
+.guide-password-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.guide-password-subtitle {
+  color: #64748b;
+  line-height: 1.5;
+}
+

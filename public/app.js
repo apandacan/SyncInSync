@@ -53,6 +53,10 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       studentGuideBtn: document.getElementById("studentGuideBtn"),
       copyStudentLineBtn: document.getElementById("copyStudentLineBtn"),
       resetBoardBtn: document.getElementById("resetBoardBtn"),
+      guidePasswordOverlay: document.getElementById("guidePasswordOverlay"),
+      guidePasswordInput: document.getElementById("guidePasswordInput"),
+      guidePasswordSubmitBtn: document.getElementById("guidePasswordSubmitBtn"),
+      guidePasswordError: document.getElementById("guidePasswordError"),
       studentGuideOverlay: document.getElementById("studentGuideOverlay"),
       studentGuideScroll: document.getElementById("studentGuideScroll"),
       studentGuideStatus: document.getElementById("studentGuideStatus"),
@@ -89,6 +93,7 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       currentGuideTitle: "Student Guide",
       currentGuideUrl: STUDENT_GUIDE_PDF_URL,
       currentGuideScale: 1.25,
+      studentGuideUnlocked: localStorage.getItem(LOCAL_STUDENT_GUIDE_UNLOCKED_KEY) === "true",
       renderedGuideKey: "",
       renderedGuideScale: 0,
       studentGuideLoading: false,
@@ -275,6 +280,31 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       saveStudentGuideScrollPosition();
       els.studentGuideOverlay.classList.remove("show");
       document.body.style.overflow = "";
+    }
+
+
+    function openGuidePasswordPrompt() {
+      els.guidePasswordInput.value = "";
+      els.guidePasswordError.textContent = "";
+      els.guidePasswordOverlay.classList.add("show");
+      document.body.style.overflow = "hidden";
+      window.setTimeout(() => els.guidePasswordInput.focus(), 0);
+    }
+
+    function closeGuidePasswordPrompt() {
+      els.guidePasswordOverlay.classList.remove("show");
+      els.guidePasswordError.textContent = "";
+      if (!els.studentGuideOverlay.classList.contains("show")) {
+        document.body.style.overflow = "";
+      }
+    }
+
+    async function maybeOpenStudentGuide() {
+      if (state.studentGuideUnlocked) {
+        await openStudentGuide("student-guide", "Student Guide", STUDENT_GUIDE_PDF_URL);
+        return;
+      }
+      openGuidePasswordPrompt();
     }
 
     function getFocusSnapshot() {
@@ -937,10 +967,37 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
       });
 
       els.studentGuideBtn.addEventListener("click", () => {
+        maybeOpenStudentGuide().catch((err) => {
+          els.studentGuideStatus.textContent = err.message || "Could not open Student Guide.";
+          els.studentGuideOverlay.classList.add("show");
+        });
+      });
+
+      els.guidePasswordSubmitBtn.addEventListener("click", () => {
+        const entered = String(els.guidePasswordInput.value || "").trim();
+        if (entered !== STUDENT_GUIDE_PASSWORD) {
+          els.guidePasswordError.textContent = "Incorrect password.";
+          return;
+        }
+        state.studentGuideUnlocked = true;
+        localStorage.setItem(LOCAL_STUDENT_GUIDE_UNLOCKED_KEY, "true");
+        closeGuidePasswordPrompt();
         openStudentGuide("student-guide", "Student Guide", STUDENT_GUIDE_PDF_URL).catch((err) => {
           els.studentGuideStatus.textContent = err.message || "Could not open Student Guide.";
           els.studentGuideOverlay.classList.add("show");
         });
+      });
+
+      els.guidePasswordInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          els.guidePasswordSubmitBtn.click();
+        }
+      });
+
+      els.guidePasswordOverlay.addEventListener("click", (e) => {
+        if (e.target === els.guidePasswordOverlay) {
+          closeGuidePasswordPrompt();
+        }
       });
 
       els.closeStudentGuideBtn.addEventListener("click", () => {
@@ -1024,6 +1081,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
     }
 
     document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && els.guidePasswordOverlay.classList.contains("show")) {
+        closeGuidePasswordPrompt();
+        return;
+      }
       if (e.key === "Escape" && els.studentGuideOverlay.classList.contains("show")) {
         closeStudentGuide();
       }

@@ -47,3 +47,5 @@ Notes:
 - removed Copy updated HPI button from the top bar
 
 - made the PDF guide window larger and added zoom in, zoom out, and reset controls
+
+- added a one-time password gate for Student Guide only, using password 1111 and remembering unlock locally
