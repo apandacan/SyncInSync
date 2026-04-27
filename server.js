@@ -188,25 +188,51 @@ function roleCoverageCounts(excludedPatientId = "") {
   return counts;
 }
 
-function pickStudentForRole(roleKey, available, coverage, usedThisRow) {
+function totalCoverageCounts(excludedPatientId = "") {
+  const counts = {};
+
+  for (const patient of state.patients) {
+    if (excludedPatientId && patient.id === excludedPatientId) continue;
+    for (const roleKey of ROLE_KEYS) {
+      const studentId = patient.assignments?.[roleKey];
+      if (!studentId) continue;
+      counts[studentId] = (counts[studentId] || 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
+function pickStudentForRole(roleKey, available, roleCoverage, totalCoverage, rowCounts) {
   const shuffled = shuffleInPlace([...available]);
-  const counts = coverage[roleKey] || {};
+  const roleCounts = roleCoverage[roleKey] || {};
+  const hasUnusedStudents = shuffled.some((student) => (rowCounts[student.id] || 0) === 0);
+
+  let eligible = shuffled;
+  if (hasUnusedStudents) {
+    eligible = shuffled.filter((student) => (rowCounts[student.id] || 0) === 0);
+  }
 
   let best = null;
-  let bestScore = Infinity;
-  let bestUsedPenalty = Infinity;
+  let bestRoleCount = Infinity;
+  let bestTotalCount = Infinity;
+  let bestRowCount = Infinity;
 
-  for (const student of shuffled) {
-    const count = counts[student.id] || 0;
-    const usedPenalty = usedThisRow.has(student.id) ? 1 : 0;
+  for (const student of eligible) {
+    const studentId = student.id;
+    const thisRoleCount = roleCounts[studentId] || 0;
+    const totalCount = totalCoverage[studentId] || 0;
+    const rowCount = rowCounts[studentId] || 0;
 
     if (
-      count < bestScore ||
-      (count === bestScore && usedPenalty < bestUsedPenalty)
+      thisRoleCount < bestRoleCount ||
+      (thisRoleCount === bestRoleCount && totalCount < bestTotalCount) ||
+      (thisRoleCount === bestRoleCount && totalCount === bestTotalCount && rowCount < bestRowCount)
     ) {
       best = student;
-      bestScore = count;
-      bestUsedPenalty = usedPenalty;
+      bestRoleCount = thisRoleCount;
+      bestTotalCount = totalCount;
+      bestRowCount = rowCount;
     }
   }
 
@@ -217,16 +243,19 @@ function randomizePatient(patient) {
   const available = sortedStudents();
   if (!available.length) return;
 
-  const coverage = roleCoverageCounts(patient.id);
+  const roleCoverage = roleCoverageCounts(patient.id);
+  const totalCoverage = totalCoverageCounts(patient.id);
   const assignments = emptyRoleAssignments();
-  const usedThisRow = new Set();
+  const rowCounts = {};
 
   for (const roleKey of ROLE_KEYS) {
-    const chosen = pickStudentForRole(roleKey, available, coverage, usedThisRow);
+    const chosen = pickStudentForRole(roleKey, available, roleCoverage, totalCoverage, rowCounts);
     if (!chosen) continue;
+
     assignments[roleKey] = chosen.id;
-    usedThisRow.add(chosen.id);
-    coverage[roleKey][chosen.id] = (coverage[roleKey][chosen.id] || 0) + 1;
+    rowCounts[chosen.id] = (rowCounts[chosen.id] || 0) + 1;
+    roleCoverage[roleKey][chosen.id] = (roleCoverage[roleKey][chosen.id] || 0) + 1;
+    totalCoverage[chosen.id] = (totalCoverage[chosen.id] || 0) + 1;
   }
 
   patient.assignments = assignments;
@@ -236,39 +265,38 @@ function randomizeScheduleBalanced() {
   const available = sortedStudents();
   if (!available.length || !state.patients.length) return;
 
-  const roleOrders = {};
+  const roleCoverage = {};
   for (const roleKey of ROLE_KEYS) {
-    roleOrders[roleKey] = shuffleInPlace([...available]).map((student) => student.id);
+    roleCoverage[roleKey] = {};
+    for (const student of available) {
+      roleCoverage[roleKey][student.id] = 0;
+    }
+  }
+
+  const totalCoverage = {};
+  for (const student of available) {
+    totalCoverage[student.id] = 0;
   }
 
   const patients = [...state.patients];
   shuffleInPlace(patients);
 
-  patients.forEach((patient, patientIndex) => {
+  for (const patient of patients) {
     const assignments = emptyRoleAssignments();
-    const usedThisRow = new Set();
+    const rowCounts = {};
 
     for (const roleKey of ROLE_KEYS) {
-      const order = roleOrders[roleKey];
-      let chosenId = "";
-      for (let offset = 0; offset < order.length; offset += 1) {
-        const candidateId = order[(patientIndex + offset) % order.length];
-        if (!usedThisRow.has(candidateId)) {
-          chosenId = candidateId;
-          break;
-        }
-      }
+      const chosen = pickStudentForRole(roleKey, available, roleCoverage, totalCoverage, rowCounts);
+      if (!chosen) continue;
 
-      if (!chosenId) {
-        chosenId = order[patientIndex % order.length] || "";
-      }
-
-      assignments[roleKey] = chosenId;
-      if (chosenId) usedThisRow.add(chosenId);
+      assignments[roleKey] = chosen.id;
+      rowCounts[chosen.id] = (rowCounts[chosen.id] || 0) + 1;
+      roleCoverage[roleKey][chosen.id] = (roleCoverage[roleKey][chosen.id] || 0) + 1;
+      totalCoverage[chosen.id] = (totalCoverage[chosen.id] || 0) + 1;
     }
 
     patient.assignments = assignments;
-  });
+  }
 }
 
 async function handleUpdate(req, res) {
@@ -381,6 +409,9 @@ async function handleUpdate(req, res) {
       ...patient,
       assignments: emptyRoleAssignments(),
     }));
+  } else if (action === "clearBoardKeepStudents") {
+    state.patients = [];
+    state.selectedPatientId = "";
   } else if (action === "setSelectedPatient") {
     const patientId = String(body.patientId || "");
     state.selectedPatientId = state.patients.some((p) => p.id === patientId)

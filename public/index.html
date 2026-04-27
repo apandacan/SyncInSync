@@ -13,9 +13,10 @@
         <h1>InSync Roles Sync</h1>
       </div>
       <div class="buttons">
-        <button class="btn-soft" id="copyStudentLineBtn">Copy student line</button>
+        <button class="btn-guide-warm" id="fourPsGuideBtn">4P&apos;s Guide</button>
+        <button class="btn-guide-blue" id="mseGuideBtn">MSE Guide</button>
+        <button class="btn-guide" id="studentGuideBtn">Student Guide</button>
         <button class="btn-soft" id="resetBoardBtn">Reset board</button>
-        <button class="btn" id="copyUpdatedHpiBtn">Copy updated HPI</button>
       </div>
     </div>
 
@@ -42,6 +43,7 @@
         <button class="btn-soft" id="applyPatientCountBtn">Populate patients</button>
         <button class="btn-soft" id="randomizeScheduleBtn">Randomize entire schedule</button>
         <button class="btn-soft" id="clearScheduleAssignmentsBtn">Clear assignments</button>
+        <button class="btn-soft" id="clearBoardBtn">Clear board</button>
       </div>
 
       <div class="notice" id="lastSync"></div>
@@ -89,10 +91,13 @@
           <select id="selectedPatientSelect"></select>
         </label>
 
-        <label>
-          <span class="label">Generated student line</span>
+        <div class="student-line-block">
+          <div class="student-line-header">
+            <span class="label">Generated student line</span>
+            <button class="btn-soft student-line-copy-btn" id="copyStudentLineBtn">Copy</button>
+          </div>
           <div class="mono" id="studentLine">Add patients and assign roles.</div>
-        </label>
+        </div>
 
         <label>
           <span class="label">Old HPI</span>
@@ -105,6 +110,29 @@
       </section>
     </div>
     <div class="footer-note">made with <span class="heart-red">❤</span> by DZ for Dr. Mao&apos;s rotation</div>
+  </div>
+
+
+  <div class="student-guide-overlay" id="studentGuideOverlay">
+    <div class="student-guide-modal">
+      <div class="student-guide-header">
+        <div>
+          <div class="student-guide-title" id="guideModalTitle">Student Guide</div>
+          <div class="student-guide-subtitle" id="guideModalSubtitle">PDF viewer</div>
+        </div>
+        <div class="student-guide-actions">
+          <button class="student-guide-zoom-btn" id="zoomOutGuideBtn" aria-label="Zoom out">−</button>
+          <button class="student-guide-zoom-readout" id="guideZoomReadout" aria-label="Current zoom">125%</button>
+          <button class="student-guide-zoom-btn" id="zoomResetGuideBtn" aria-label="Reset zoom">Reset</button>
+          <button class="student-guide-zoom-btn" id="zoomInGuideBtn" aria-label="Zoom in">+</button>
+          <button class="student-guide-close" id="closeStudentGuideBtn" aria-label="Close Guide">✕</button>
+        </div>
+      </div>
+      <div class="student-guide-scroll" id="studentGuideScroll">
+        <div class="student-guide-status" id="studentGuideStatus">Loading guide...</div>
+        <div class="student-guide-pages" id="studentGuidePages"></div>
+      </div>
+    </div>
   </div>
 
   <div class="identity-overlay" id="identityOverlay">

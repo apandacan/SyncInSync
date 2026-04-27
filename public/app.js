@@ -25,6 +25,11 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
     const LOCAL_CURRENT_USER_ID_KEY = "insync-current-user-id-v1";
     const LOCAL_CURRENT_USER_NAME_KEY = "insync-current-user-name-v1";
     const LOCAL_CURRENT_USER_ROLE_KEY = "insync-current-user-role-v1";
+    const LOCAL_GUIDE_SCROLL_KEY_PREFIX = "insync-guide-scroll-v1-";
+    const LOCAL_GUIDE_SCALE_KEY_PREFIX = "insync-guide-scale-v1-";
+    const STUDENT_GUIDE_PDF_URL = "/student-guide.pdf";
+    const MSE_GUIDE_PDF_URL = "/mse-guide.pdf";
+    const FOUR_PS_GUIDE_PDF_URL = "/4ps-guide.pdf";
 
     const els = {
       studentsList: document.getElementById("studentsList"),
@@ -33,6 +38,7 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       applyPatientCountBtn: document.getElementById("applyPatientCountBtn"),
       randomizeScheduleBtn: document.getElementById("randomizeScheduleBtn"),
       clearScheduleAssignmentsBtn: document.getElementById("clearScheduleAssignmentsBtn"),
+      clearBoardBtn: document.getElementById("clearBoardBtn"),
       selectedPatientSelect: document.getElementById("selectedPatientSelect"),
       studentLine: document.getElementById("studentLine"),
       oldHpi: document.getElementById("oldHpi"),
@@ -42,9 +48,22 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       errorBox: document.getElementById("errorBox"),
       toast: document.getElementById("toast"),
       addStudentBtn: document.getElementById("addStudentBtn"),
+      fourPsGuideBtn: document.getElementById("fourPsGuideBtn"),
+      mseGuideBtn: document.getElementById("mseGuideBtn"),
+      studentGuideBtn: document.getElementById("studentGuideBtn"),
       copyStudentLineBtn: document.getElementById("copyStudentLineBtn"),
-      copyUpdatedHpiBtn: document.getElementById("copyUpdatedHpiBtn"),
       resetBoardBtn: document.getElementById("resetBoardBtn"),
+      studentGuideOverlay: document.getElementById("studentGuideOverlay"),
+      studentGuideScroll: document.getElementById("studentGuideScroll"),
+      studentGuideStatus: document.getElementById("studentGuideStatus"),
+      studentGuidePages: document.getElementById("studentGuidePages"),
+      guideModalTitle: document.getElementById("guideModalTitle"),
+      guideModalSubtitle: document.getElementById("guideModalSubtitle"),
+      zoomOutGuideBtn: document.getElementById("zoomOutGuideBtn"),
+      zoomInGuideBtn: document.getElementById("zoomInGuideBtn"),
+      zoomResetGuideBtn: document.getElementById("zoomResetGuideBtn"),
+      guideZoomReadout: document.getElementById("guideZoomReadout"),
+      closeStudentGuideBtn: document.getElementById("closeStudentGuideBtn"),
       identityOverlay: document.getElementById("identityOverlay"),
       identityNameInput: document.getElementById("identityNameInput"),
       identityRoleInput: document.getElementById("identityRoleInput"),
@@ -66,6 +85,15 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       currentUserStudentId: localStorage.getItem(LOCAL_CURRENT_USER_ID_KEY) || "",
       currentUserName: localStorage.getItem(LOCAL_CURRENT_USER_NAME_KEY) || "",
       currentUserRoleTitle: localStorage.getItem(LOCAL_CURRENT_USER_ROLE_KEY) || "Medical Student",
+      currentGuideKey: "student-guide",
+      currentGuideTitle: "Student Guide",
+      currentGuideUrl: STUDENT_GUIDE_PDF_URL,
+      currentGuideScale: 1.25,
+      renderedGuideKey: "",
+      renderedGuideScale: 0,
+      studentGuideLoading: false,
+      studentGuidePdf: null,
+      studentGuideScrollRestorePending: false,
     };
 
     function saveCurrentUserLocally() {
@@ -90,6 +118,163 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
     function closeIdentityPrompt() {
       els.identityOverlay.classList.remove("show");
       els.identityError.textContent = "";
+    }
+
+
+    function loadPdfJs() {
+      if (window.pdfjsLib) {
+        return Promise.resolve(window.pdfjsLib);
+      }
+
+      return new Promise((resolve, reject) => {
+        const existing = document.getElementById("pdfjs-cdn-script");
+        if (existing) {
+          existing.addEventListener("load", () => resolve(window.pdfjsLib), { once: true });
+          existing.addEventListener("error", () => reject(new Error("Could not load PDF viewer library.")), { once: true });
+          return;
+        }
+
+        const script = document.createElement("script");
+        script.id = "pdfjs-cdn-script";
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        script.async = true;
+        script.onload = () => {
+          if (!window.pdfjsLib) {
+            reject(new Error("PDF viewer library did not initialize."));
+            return;
+          }
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          resolve(window.pdfjsLib);
+        };
+        script.onerror = () => reject(new Error("Could not load PDF viewer library."));
+        document.head.appendChild(script);
+      });
+    }
+
+    function saveStudentGuideScrollPosition() {
+      if (!els.studentGuideScroll) return;
+      localStorage.setItem(LOCAL_GUIDE_SCROLL_KEY_PREFIX + state.currentGuideKey, String(els.studentGuideScroll.scrollTop || 0));
+    }
+
+    function restoreStudentGuideScrollPosition() {
+      const saved = Number(localStorage.getItem(LOCAL_GUIDE_SCROLL_KEY_PREFIX + state.currentGuideKey) || "0");
+      if (!Number.isFinite(saved)) return;
+      els.studentGuideScroll.scrollTop = saved;
+    }
+
+
+    function loadStudentGuideScale() {
+      const saved = Number(localStorage.getItem(LOCAL_GUIDE_SCALE_KEY_PREFIX + state.currentGuideKey) || "1.25");
+      if (!Number.isFinite(saved)) return 1.25;
+      return Math.min(2.25, Math.max(0.75, saved));
+    }
+
+    function saveStudentGuideScale() {
+      localStorage.setItem(LOCAL_GUIDE_SCALE_KEY_PREFIX + state.currentGuideKey, String(state.currentGuideScale || 1.25));
+    }
+
+    function updateGuideZoomReadout() {
+      if (!els.guideZoomReadout) return;
+      els.guideZoomReadout.textContent = Math.round((state.currentGuideScale || 1.25) * 100) + "%";
+    }
+
+    async function setGuideZoom(nextScale) {
+      const clamped = Math.min(2.25, Math.max(0.75, nextScale));
+      if (Math.abs(clamped - (state.currentGuideScale || 1.25)) < 0.001) return;
+
+      const scrollEl = els.studentGuideScroll;
+      const beforeHeight = scrollEl.scrollHeight || 1;
+      const beforeTop = scrollEl.scrollTop || 0;
+      const ratio = beforeTop / beforeHeight;
+
+      state.currentGuideScale = clamped;
+      saveStudentGuideScale();
+      updateGuideZoomReadout();
+      state.renderedGuideKey = "";
+      state.renderedGuideScale = 0;
+
+      await renderStudentGuide();
+
+      requestAnimationFrame(() => {
+        const afterHeight = scrollEl.scrollHeight || 1;
+        scrollEl.scrollTop = ratio * afterHeight;
+      });
+    }
+
+    async function renderStudentGuide() {
+      if (state.studentGuideLoading) return;
+
+      if (state.renderedGuideKey === state.currentGuideKey && state.renderedGuideScale === state.currentGuideScale && els.studentGuidePages.childElementCount > 0) {
+        els.studentGuideStatus.textContent = "";
+        return;
+      }
+
+      state.studentGuideLoading = true;
+      els.studentGuideStatus.textContent = "Loading " + state.currentGuideTitle + "...";
+      els.studentGuidePages.innerHTML = "";
+
+      try {
+        const pdfjsLib = await loadPdfJs();
+        const loadingTask = pdfjsLib.getDocument(state.currentGuideUrl);
+        const pdf = await loadingTask.promise;
+        state.studentGuidePdf = pdf;
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          const page = await pdf.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: state.currentGuideScale || 1.25 });
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "student-guide-page";
+
+          const label = document.createElement("div");
+          label.className = "student-guide-page-label";
+          label.textContent = "Page " + pageNumber;
+
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+
+          const context = canvas.getContext("2d");
+          await page.render({
+            canvasContext: context,
+            viewport,
+          }).promise;
+
+          wrapper.appendChild(label);
+          wrapper.appendChild(canvas);
+          els.studentGuidePages.appendChild(wrapper);
+        }
+
+        els.studentGuideStatus.textContent = "";
+        state.renderedGuideKey = state.currentGuideKey;
+        state.renderedGuideScale = state.currentGuideScale || 1.25;
+        requestAnimationFrame(() => restoreStudentGuideScrollPosition());
+      } catch (error) {
+        els.studentGuideStatus.textContent = "Could not load " + state.currentGuideTitle + ". Add a PDF at " + state.currentGuideUrl.replace("/", "public/") + " and redeploy.";
+        console.error(error);
+      } finally {
+        state.studentGuideLoading = false;
+      }
+    }
+
+    async function openStudentGuide(guideKey, guideTitle, guideUrl) {
+      state.currentGuideKey = guideKey;
+      state.currentGuideTitle = guideTitle;
+      state.currentGuideUrl = guideUrl;
+      state.currentGuideScale = loadStudentGuideScale();
+      updateGuideZoomReadout();
+      els.guideModalTitle.textContent = guideTitle;
+      els.guideModalSubtitle.textContent = "PDF viewer";
+      els.studentGuideOverlay.classList.add("show");
+      document.body.style.overflow = "hidden";
+      await renderStudentGuide();
+      requestAnimationFrame(() => restoreStudentGuideScrollPosition());
+    }
+
+    function closeStudentGuide() {
+      saveStudentGuideScrollPosition();
+      els.studentGuideOverlay.classList.remove("show");
+      document.body.style.overflow = "";
     }
 
     function getFocusSnapshot() {
@@ -428,6 +613,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
       await apiUpdate({ action: "clearScheduleAssignments" });
     }
 
+    async function clearBoardKeepStudents() {
+      await apiUpdate({ action: "clearBoardKeepStudents" });
+    }
+
     async function setSelectedPatient(patientId) {
       await apiUpdate({ action: "setSelectedPatient", patientId });
     }
@@ -733,8 +922,60 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
         addStudent().catch((err) => showError(err.message || "Add failed"));
       });
 
+      els.fourPsGuideBtn.addEventListener("click", () => {
+        openStudentGuide("4ps-guide", "4P's Guide", FOUR_PS_GUIDE_PDF_URL).catch((err) => {
+          els.studentGuideStatus.textContent = err.message || "Could not open 4P's Guide.";
+          els.studentGuideOverlay.classList.add("show");
+        });
+      });
+
+      els.mseGuideBtn.addEventListener("click", () => {
+        openStudentGuide("mse-guide", "MSE Guide", MSE_GUIDE_PDF_URL).catch((err) => {
+          els.studentGuideStatus.textContent = err.message || "Could not open MSE Guide.";
+          els.studentGuideOverlay.classList.add("show");
+        });
+      });
+
+      els.studentGuideBtn.addEventListener("click", () => {
+        openStudentGuide("student-guide", "Student Guide", STUDENT_GUIDE_PDF_URL).catch((err) => {
+          els.studentGuideStatus.textContent = err.message || "Could not open Student Guide.";
+          els.studentGuideOverlay.classList.add("show");
+        });
+      });
+
+      els.closeStudentGuideBtn.addEventListener("click", () => {
+        closeStudentGuide();
+      });
+
+      els.zoomOutGuideBtn.addEventListener("click", () => {
+        setGuideZoom((state.currentGuideScale || 1.25) - 0.15).catch((err) => {
+          els.studentGuideStatus.textContent = err.message || "Could not zoom out.";
+        });
+      });
+
+      els.zoomInGuideBtn.addEventListener("click", () => {
+        setGuideZoom((state.currentGuideScale || 1.25) + 0.15).catch((err) => {
+          els.studentGuideStatus.textContent = err.message || "Could not zoom in.";
+        });
+      });
+
+      els.zoomResetGuideBtn.addEventListener("click", () => {
+        setGuideZoom(1.25).catch((err) => {
+          els.studentGuideStatus.textContent = err.message || "Could not reset zoom.";
+        });
+      });
+
+      els.studentGuideOverlay.addEventListener("click", (e) => {
+        if (e.target === els.studentGuideOverlay) {
+          closeStudentGuide();
+        }
+      });
+
+      els.studentGuideScroll.addEventListener("scroll", () => {
+        saveStudentGuideScrollPosition();
+      });
+
       els.copyStudentLineBtn.addEventListener("click", () => copyText(buildStudentLine(), "student line"));
-      els.copyUpdatedHpiBtn.addEventListener("click", () => copyText(updatedHpi(), "updated HPI"));
       els.resetBoardBtn.addEventListener("click", () => {
         resetBoard().catch((err) => showError(err.message || "Reset failed"));
       });
@@ -759,6 +1000,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
         clearScheduleAssignments().catch((err) => showError(err.message || "Could not clear assignments"));
       });
 
+      els.clearBoardBtn.addEventListener("click", () => {
+        clearBoardKeepStudents().catch((err) => showError(err.message || "Could not clear board"));
+      });
+
       els.selectedPatientSelect.addEventListener("change", (e) => {
         setSelectedPatient(e.target.value).catch((err) => showError(err.message || "Could not change selected patient"));
       });
@@ -777,6 +1022,12 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
           });
       });
     }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && els.studentGuideOverlay.classList.contains("show")) {
+        closeStudentGuide();
+      }
+    });
 
     render();
     wireInputs();
