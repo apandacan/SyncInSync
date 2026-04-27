@@ -48,4 +48,4 @@ Notes:
 
 - made the PDF guide window larger and added zoom in, zoom out, and reset controls
 
-- added a one-time password gate for Student Guide only, using password 1111 and remembering unlock locally
+- added a one-time password gate for Student Guide only, using password and remembering unlock locally
