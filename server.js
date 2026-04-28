@@ -9,6 +9,9 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const DATA_FILE = path.join(__dirname, "shared_state.json");
 
 const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"];
+const CORE_ROLE_KEYS = ["hpi", "plan", "mse", "psychotherapy", "meds"];
+const SECONDARY_ROLE_KEYS = ["interviewer"];
+const ASSIGNMENT_ROLE_ORDER = [...CORE_ROLE_KEYS, ...SECONDARY_ROLE_KEYS];
 
 function emptyRoleAssignments() {
   return {
@@ -248,7 +251,7 @@ function randomizePatient(patient) {
   const assignments = emptyRoleAssignments();
   const rowCounts = {};
 
-  for (const roleKey of ROLE_KEYS) {
+  for (const roleKey of ASSIGNMENT_ROLE_ORDER) {
     const chosen = pickStudentForRole(roleKey, available, roleCoverage, totalCoverage, rowCounts);
     if (!chosen) continue;
 
@@ -285,7 +288,7 @@ function randomizeScheduleBalanced() {
     const assignments = emptyRoleAssignments();
     const rowCounts = {};
 
-    for (const roleKey of ROLE_KEYS) {
+    for (const roleKey of ASSIGNMENT_ROLE_ORDER) {
       const chosen = pickStudentForRole(roleKey, available, roleCoverage, totalCoverage, rowCounts);
       if (!chosen) continue;
 

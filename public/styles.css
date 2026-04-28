@@ -428,3 +428,14 @@
 .btn-guide-purple:hover {
   background: #6d28d9;
 }
+.student-guide-download-btn {
+  background: #0f172a;
+  color: #fff;
+  border: 1px solid #0f172a;
+  border-radius: 12px;
+  padding: 8px 12px;
+  line-height: 1;
+}
+.student-guide-download-btn:hover {
+  background: #1e293b;
+}

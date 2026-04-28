@@ -67,6 +67,7 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       studentGuidePages: document.getElementById("studentGuidePages"),
       guideModalTitle: document.getElementById("guideModalTitle"),
       guideModalSubtitle: document.getElementById("guideModalSubtitle"),
+      downloadGuideBtn: document.getElementById("downloadGuideBtn"),
       zoomOutGuideBtn: document.getElementById("zoomOutGuideBtn"),
       zoomInGuideBtn: document.getElementById("zoomInGuideBtn"),
       zoomResetGuideBtn: document.getElementById("zoomResetGuideBtn"),
@@ -301,6 +302,20 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       if (!els.studentGuideOverlay.classList.contains("show")) {
         document.body.style.overflow = "";
       }
+    }
+
+    function downloadCurrentGuide() {
+      if (state.currentGuideKey === "student-guide" && !state.studentGuideUnlocked) {
+        openGuidePasswordPrompt();
+        return;
+      }
+
+      const link = document.createElement("a");
+      link.href = state.currentGuideUrl;
+      link.download = state.currentGuideUrl.split("/").pop() || "guide.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     }
 
     async function maybeOpenStudentGuide() {
@@ -1013,6 +1028,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
 
       els.closeStudentGuideBtn.addEventListener("click", () => {
         closeStudentGuide();
+      });
+
+      els.downloadGuideBtn.addEventListener("click", () => {
+        downloadCurrentGuide();
       });
 
       els.zoomOutGuideBtn.addEventListener("click", () => {
