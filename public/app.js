@@ -28,6 +28,8 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
     const LOCAL_GUIDE_SCROLL_KEY_PREFIX = "insync-guide-scroll-v1-";
     const LOCAL_GUIDE_SCALE_KEY_PREFIX = "insync-guide-scale-v1-";
     const LOCAL_STUDENT_GUIDE_UNLOCKED_KEY = "insync-student-guide-unlocked-v1";
+    const CURRENT_UPDATE_POPUP_ID = "12pm-divider-v1";
+    const LOCAL_HIDE_UPDATE_POPUP_KEY = "insync-hide-update-popup-" + CURRENT_UPDATE_POPUP_ID;
     const STUDENT_GUIDE_PASSWORD = "1111";
     const STUDENT_GUIDE_PDF_URL = "/student-guide.pdf";
     const MSE_GUIDE_PDF_URL = "/mse-guide.pdf";
@@ -57,6 +59,9 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       studentGuideBtn: document.getElementById("studentGuideBtn"),
       copyStudentLineBtn: document.getElementById("copyStudentLineBtn"),
       resetBoardBtn: document.getElementById("resetBoardBtn"),
+      updatePopup: document.getElementById("updatePopup"),
+      closeUpdatePopupBtn: document.getElementById("closeUpdatePopupBtn"),
+      hideUpdatePopupCheckbox: document.getElementById("hideUpdatePopupCheckbox"),
       guidePasswordOverlay: document.getElementById("guidePasswordOverlay"),
       guidePasswordInput: document.getElementById("guidePasswordInput"),
       guidePasswordSubmitBtn: document.getElementById("guidePasswordSubmitBtn"),
@@ -304,6 +309,18 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       if (!els.studentGuideOverlay.classList.contains("show")) {
         document.body.style.overflow = "";
       }
+    }
+
+    function showUpdatePopupIfNeeded() {
+      if (localStorage.getItem(LOCAL_HIDE_UPDATE_POPUP_KEY) === "true") return;
+      els.updatePopup.classList.add("show");
+    }
+
+    function closeUpdatePopup() {
+      if (els.hideUpdatePopupCheckbox.checked) {
+        localStorage.setItem(LOCAL_HIDE_UPDATE_POPUP_KEY, "true");
+      }
+      els.updatePopup.classList.remove("show");
     }
 
     function downloadCurrentGuide() {
@@ -1073,6 +1090,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
         addStudent().catch((err) => showError(err.message || "Add failed"));
       });
 
+      els.closeUpdatePopupBtn.addEventListener("click", () => {
+        closeUpdatePopup();
+      });
+
       els.placingMedsGuideBtn.addEventListener("click", () => {
         openStudentGuide("placing-meds-guide", "Placing Meds", PLACING_MEDS_GUIDE_PDF_URL).catch((err) => {
           els.studentGuideStatus.textContent = err.message || "Could not open Placing Meds.";
@@ -1224,4 +1245,5 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
 
     render();
     wireInputs();
+    showUpdatePopupIfNeeded();
     connectBoard();
