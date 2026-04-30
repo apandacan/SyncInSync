@@ -84,6 +84,7 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       students: [],
       patients: [],
       selectedPatientId: "",
+      lunchDividerIndex: 0,
       updatedAt: null,
       oldHpi: sessionStorage.getItem(LOCAL_HPI_KEY) || "",
       eventSource: null,
@@ -104,6 +105,7 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       studentGuideLoading: false,
       studentGuidePdf: null,
       studentGuideScrollRestorePending: false,
+      isDraggingLunchDivider: false,
     };
 
     function saveCurrentUserLocally() {
@@ -410,6 +412,62 @@ const ROLE_KEYS = ["interviewer", "hpi", "plan", "mse", "psychotherapy", "meds"]
       return selectablePatients.find((patient) => patient.id === state.selectedPatientId) || selectablePatients[0] || null;
     }
 
+    function getLunchDropIndexFromRowEvent(patientIndex, event) {
+      const row = event.currentTarget;
+      const rect = row.getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+      const isUpperHalf = event.clientY < midpoint;
+      return isUpperHalf ? patientIndex : patientIndex + 1;
+    }
+
+    function clearLunchDropTargets() {
+      document.querySelectorAll(".patient-drop-target-before, .patient-drop-target-after").forEach((el) => {
+        el.classList.remove("patient-drop-target-before", "patient-drop-target-after");
+      });
+    }
+
+    function renderLunchDividerRow() {
+      const row = document.createElement("tr");
+      row.className = "lunch-divider-row";
+
+      const cell = document.createElement("td");
+      cell.colSpan = 8;
+
+      const wrap = document.createElement("div");
+      wrap.className = "lunch-divider-wrap";
+
+      const line = document.createElement("div");
+      line.className = "lunch-divider-line";
+
+      const badge = document.createElement("div");
+      badge.className = "lunch-divider-badge";
+      badge.textContent = "12PM";
+      badge.draggable = true;
+      badge.title = "Drag to move divider";
+
+      badge.addEventListener("dragstart", (e) => {
+        state.isDraggingLunchDivider = true;
+        badge.classList.add("dragging");
+        try {
+          e.dataTransfer.setData("text/plain", "12pm-divider");
+        } catch {}
+        e.dataTransfer.effectAllowed = "move";
+      });
+
+      badge.addEventListener("dragend", () => {
+        state.isDraggingLunchDivider = false;
+        badge.classList.remove("dragging");
+        clearLunchDropTargets();
+      });
+
+      line.appendChild(badge);
+      wrap.appendChild(line);
+      cell.appendChild(wrap);
+      row.appendChild(cell);
+
+      return row;
+    }
+
 function reconcileLocalStudentNames(serverStudents) {
   const serverMap = new Map((serverStudents || []).map((student) => [student.id, student.name || ""]));
 
@@ -554,6 +612,7 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
       state.students = nextStudents;
       state.patients = Array.isArray(data.patients) ? data.patients : [];
       state.selectedPatientId = data.selectedPatientId || "";
+      state.lunchDividerIndex = Number.isFinite(Number(data.lunchDividerIndex)) ? Number(data.lunchDividerIndex) : 0;
       state.updatedAt = data.updatedAt || null;
 
       if (state.currentUserStudentId) {
@@ -664,6 +723,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
 
     async function clearBoardKeepStudents() {
       await apiUpdate({ action: "clearBoardKeepStudents" });
+    }
+
+    async function setLunchDividerIndex(index) {
+      await apiUpdate({ action: "setLunchDividerIndex", index });
     }
 
     async function setSelectedPatient(patientId) {
@@ -838,13 +901,48 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
       }
 
       const students = availableStudents();
+      const dividerIndex = Math.max(0, Math.min(state.patients.length, Number(state.lunchDividerIndex) || 0));
 
-      state.patients.forEach((patient) => {
+      if (dividerIndex === 0) {
+        els.patientsTableBody.appendChild(renderLunchDividerRow());
+      }
+
+      state.patients.forEach((patient, patientIndex) => {
         const row = document.createElement("tr");
         row.className =
           "patient-clickable-row" +
           (patient.id === state.selectedPatientId ? " selected-row" : "") +
           (patient.ended ? " ended-row" : "");
+
+        row.addEventListener("dragover", (e) => {
+          if (!state.isDraggingLunchDivider) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          const rect = row.getBoundingClientRect();
+          const midpoint = rect.top + rect.height / 2;
+          const isUpperHalf = e.clientY < midpoint;
+          clearLunchDropTargets();
+          row.classList.add(isUpperHalf ? "patient-drop-target-before" : "patient-drop-target-after");
+        });
+
+        row.addEventListener("dragleave", (e) => {
+          if (!state.isDraggingLunchDivider) return;
+          const related = e.relatedTarget;
+          if (!related || !row.contains(related)) {
+            row.classList.remove("patient-drop-target-before", "patient-drop-target-after");
+          }
+        });
+
+        row.addEventListener("drop", (e) => {
+          if (!state.isDraggingLunchDivider) return;
+          e.preventDefault();
+          row.classList.remove("patient-drop-target-before", "patient-drop-target-after");
+          const nextIndex = getLunchDropIndexFromRowEvent(patientIndex, e);
+          state.lunchDividerIndex = Math.max(0, Math.min(state.patients.length, nextIndex));
+          renderPatientsTable();
+          setLunchDividerIndex(state.lunchDividerIndex).catch((err) => showError(err.message || "Could not move 12PM divider"));
+        });
+
         row.addEventListener("click", (e) => {
           if (patient.ended) return;
           if (e.target.closest("select") || e.target.closest("button")) return;
@@ -935,6 +1033,10 @@ function reconcileLocalStudentRoleTitles(serverStudents) {
         row.appendChild(actionCell);
 
         els.patientsTableBody.appendChild(row);
+
+        if (dividerIndex === patientIndex + 1) {
+          els.patientsTableBody.appendChild(renderLunchDividerRow());
+        }
       });
     }
 

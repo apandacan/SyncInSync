@@ -29,6 +29,7 @@ function defaultState() {
     students: [],
     patients: [],
     selectedPatientId: "",
+    lunchDividerIndex: 0,
     updatedAt: Date.now(),
   };
 }
@@ -60,6 +61,10 @@ function loadState() {
     const selectedPatientId = patients.some((p) => p.id === parsed.selectedPatientId)
       ? parsed.selectedPatientId
       : (patients[0]?.id || "");
+    const rawLunchDividerIndex = Number(parsed.lunchDividerIndex);
+    const lunchDividerIndex = Number.isFinite(rawLunchDividerIndex)
+      ? Math.max(0, Math.min(patients.length, rawLunchDividerIndex))
+      : (patients.length ? Math.ceil(patients.length / 2) : 0);
 
     return {
       students: Array.isArray(parsed.students)
@@ -72,6 +77,7 @@ function loadState() {
         : [],
       patients,
       selectedPatientId,
+      lunchDividerIndex,
       updatedAt: parsed.updatedAt || Date.now(),
     };
   } catch {
@@ -387,6 +393,13 @@ async function handleUpdate(req, res) {
     state.selectedPatientId = selectable.some((p) => p.id === state.selectedPatientId)
       ? state.selectedPatientId
       : (selectable[0]?.id || "");
+    if (!count) {
+      state.lunchDividerIndex = 0;
+    } else if (!Number.isFinite(Number(state.lunchDividerIndex))) {
+      state.lunchDividerIndex = Math.ceil(count / 2);
+    } else {
+      state.lunchDividerIndex = Math.max(0, Math.min(count, Number(state.lunchDividerIndex)));
+    }
   } else if (action === "updatePatientRole") {
     const patient = state.patients.find((p) => p.id === body.patientId);
     if (!patient) {
@@ -415,6 +428,10 @@ async function handleUpdate(req, res) {
   } else if (action === "clearBoardKeepStudents") {
     state.patients = [];
     state.selectedPatientId = "";
+    state.lunchDividerIndex = 0;
+  } else if (action === "setLunchDividerIndex") {
+    const maxIndex = state.patients.length;
+    state.lunchDividerIndex = Math.max(0, Math.min(maxIndex, Number(body.index) || 0));
   } else if (action === "setSelectedPatient") {
     const patientId = String(body.patientId || "");
     state.selectedPatientId = state.patients.some((p) => p.id === patientId)
